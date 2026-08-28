@@ -1,0 +1,14 @@
+[
+  {
+    "type": "ugw",
+    "name": "Security Gateway",
+    "model": "UGW3",
+    "state": 1,
+    "wan1": {
+      "up": true,
+      "ip": "198.51.100.9",
+      "rx_bytes": 1000000,
+      "tx_bytes": 200000
+    }
+  }
+]

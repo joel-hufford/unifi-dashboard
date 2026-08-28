@@ -1,0 +1,46 @@
+# Copy to config.toml (or ~/.config/unifi-dashboard/config.toml) and edit.
+# Secrets can also come from the environment, which is preferred for systemd:
+#   UNIFI_DASHBOARD_API_KEY, UNIFI_DASHBOARD_USERNAME, UNIFI_DASHBOARD_PASSWORD
+
+# Seconds between controller polls. 10s keeps the load on the console trivial
+# while still giving a 360-point graph over one hour.
+poll_interval = 10.0
+
+[unifi]
+# Your console / controller. Use https:// and the LAN address.
+host = "https://192.168.1.1"
+site = "default"
+
+# Preferred: an API key from Network -> Settings -> Control Plane -> Integrations.
+# Requires UniFi Network 9.x on UniFi OS 4.1+.
+api_key = ""
+
+# Fallback for older controllers: a LOCAL-ONLY admin with read-only permissions
+# and 2FA disabled. Leave api_key empty to use this.
+username = ""
+password = ""
+
+# UniFi consoles ship a self-signed certificate, so verification is off by
+# default. Set a path to the console's certificate to turn it back on.
+verify_ssl = false
+timeout = 10.0
+
+[ping]
+# WAN reachability probe, measured from the Pi itself.
+target = "8.8.8.8"
+count = 3          # packets per poll; more packets = finer packet-loss resolution
+interval = 0.25    # seconds between packets (>= 0.2 without root)
+timeout = 1.0      # seconds to wait for each reply
+
+[server]
+host = "127.0.0.1"  # 0.0.0.0 to reach the dashboard from other machines
+port = 8787
+
+[history]
+window_minutes = 60      # default graph window
+retention_minutes = 180  # how much history to keep on disk
+db_path = "~/.local/share/unifi-dashboard/history.db"
+
+[wlan]
+# A client at or below this signal (dBm) counts as "weak".
+weak_signal_dbm = -70

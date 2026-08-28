@@ -1,0 +1,21 @@
+[
+  {
+    "type": "udm",
+    "name": "Dream Machine Pro",
+    "model": "UDMPRO",
+    "state": 1,
+    "upgradable": false,
+    "wan1": {
+      "up": true,
+      "ip": "203.0.113.47",
+      "rx_bytes-r": 5242880.0,
+      "tx_bytes-r": 262144.0,
+      "rx_bytes": 91234567890,
+      "tx_bytes": 8123456789,
+      "isp_name": "Example Fiber"
+    }
+  },
+  {"type": "usw", "name": "Office switch", "model": "US8P150", "state": 1, "upgradable": true},
+  {"type": "uap", "name": "Office AP", "model": "U6PRO", "state": 1, "upgradable": false},
+  {"type": "uap", "name": "Shop AP", "model": "U6LR", "state": 0, "upgradable": false}
+]

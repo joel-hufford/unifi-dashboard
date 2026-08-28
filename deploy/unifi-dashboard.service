@@ -1,0 +1,33 @@
+[Unit]
+Description=UniFi status dashboard
+Documentation=https://github.com/joel-hufford/unifi-dashboard
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=%i
+WorkingDirectory=/opt/unifi-dashboard
+Environment=PYTHONUNBUFFERED=1
+# Keep the API key out of the config file if you prefer:
+#   UNIFI_DASHBOARD_API_KEY=...
+EnvironmentFile=-/etc/unifi-dashboard/secrets.env
+ExecStart=/opt/unifi-dashboard/.venv/bin/python -m unifi_dashboard --config /etc/unifi-dashboard/config.toml
+Restart=on-failure
+RestartSec=5
+
+# The history database lives in /var/lib/unifi-dashboard.
+StateDirectory=unifi-dashboard
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+ProtectKernelTunables=true
+ProtectControlGroups=true
+RestrictNamespaces=true
+RestrictSUIDSGID=true
+# Deliberately NOT NoNewPrivileges: /usr/bin/ping carries a file capability
+# (cap_net_raw) and NoNewPrivileges would strip it, so latency and packet loss
+# would silently stop working. The service itself gains no capabilities.
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,26 @@
+[
+  {"mac": "aa:bb:cc:00:00:01", "name": "Office desktop", "is_wired": true},
+  {"mac": "aa:bb:cc:00:00:02", "hostname": "nas", "is_wired": true},
+  {
+    "mac": "aa:bb:cc:00:00:03", "name": "Joel's MacBook", "is_wired": false,
+    "signal": -52, "radio": "na", "channel": 44, "essid": "Home",
+    "ap_displayname": "Office AP", "satisfaction": 96,
+    "tx_rate": 866700, "rx_rate": 780000
+  },
+  {
+    "mac": "aa:bb:cc:00:00:04", "name": "Kitchen iPad", "is_wired": false,
+    "signal": -71, "radio": "ng", "channel": 6, "essid": "Home",
+    "ap_displayname": "Living room AP", "satisfaction": -1,
+    "tx_rate": 130000, "rx_rate": 120000
+  },
+  {
+    "mac": "aa:bb:cc:00:00:05", "name": "Thermostat", "is_wired": false,
+    "rssi": 18, "channel": 1, "essid": "Home", "ap_mac": "78:8a:20:aa:bb:cc",
+    "satisfaction": 0
+  },
+  {
+    "mac": "aa:bb:cc:00:00:06", "name": "Guest phone", "is_wired": false,
+    "is_guest": true, "signal": -63, "radio": "6e", "channel": 37,
+    "essid": "Home Guest", "ap_displayname": "Shop AP", "satisfaction": 74
+  }
+]

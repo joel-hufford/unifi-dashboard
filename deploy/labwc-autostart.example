@@ -1,0 +1,12 @@
+# ~/.config/labwc/autostart  (Raspberry Pi OS Bookworm and later use labwc)
+#
+# 1. Rotate the Touch Display 2 into landscape. The panel is natively portrait,
+#    so drop this line if you are mounting it upright. Check the output name
+#    with: wlr-randr
+wlr-randr --output DSI-1 --transform 90 &
+
+# 2. Start the kiosk browser.
+/opt/unifi-dashboard/deploy/kiosk.sh &
+
+# Screen blanking is a separate setting, not something to script here:
+#   sudo raspi-config  ->  Display Options  ->  Screen Blanking  ->  No
