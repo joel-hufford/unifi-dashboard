@@ -4,7 +4,14 @@ __pycache__/
 venv/
 *.egg-info/
 .pytest_cache/
+# Anything that could hold controller credentials. config.toml is where the
+# API key goes when you run from a clone instead of /etc/unifi-dashboard.
 config.toml
+config.local.toml
+secrets.env
+*.env
+.env
+
 *.db
 *.db-wal
 *.db-shm
