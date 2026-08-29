@@ -100,11 +100,25 @@ The dashboard only ever issues GETs.
 
 ```bash
 mkdir -p ~/.config/labwc
-cp /opt/unifi-dashboard/deploy/labwc-autostart.example ~/.config/labwc/autostart
+cp /etc/xdg/labwc/autostart ~/.config/labwc/autostart          # keep the desktop bits
+cat /opt/unifi-dashboard/deploy/labwc-autostart.example >> ~/.config/labwc/autostart
+chmod 644 ~/.config/labwc/autostart
 ```
 
-Edit that file to set (or remove) the rotation, then turn off screen blanking
-in `sudo raspi-config` -> Display Options -> Screen Blanking. Reboot.
+Create it as your login user, not with `sudo`: 644 on the file, 755 on
+`~/.config/labwc`. labwc runs it through `sh`, so no execute bit is needed.
+A user autostart **replaces** `/etc/xdg/labwc/autostart` rather than adding to
+it, which is why the copy comes first — skip it only if you want a bare kiosk
+screen with no panel or wallpaper.
+
+Edit the file to set (or remove) the display-mode line, then turn off screen
+blanking in `sudo raspi-config` -> Display Options -> Screen Blanking. Reboot.
+
+If your panel's native mode is missing from `wlr-randr`, a
+`--custom-mode` line here is usually less brittle than a `video=` argument in
+`/boot/firmware/cmdline.txt`, which OS updates can rewrite. Note that
+`cmdline.txt` is a **single line** — parameters are appended to the existing
+line, space-separated; a second line is ignored.
 
 Raspberry Pi OS Bookworm and later run labwc; on an older Wayfire image the
 equivalent goes in `~/.config/wayfire.ini` under `[autostart]`.

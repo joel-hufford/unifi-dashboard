@@ -1,11 +1,31 @@
-# ~/.config/labwc/autostart  (Raspberry Pi OS Bookworm and later use labwc)
+# ~/.config/labwc/autostart   (Raspberry Pi OS Bookworm and later use labwc)
 #
-# 1. Rotate the Touch Display 2 into landscape. The panel is natively portrait,
-#    so drop this line if you are mounting it upright. Check the output name
-#    with: wlr-randr
-wlr-randr --output DSI-1 --transform 90 &
+# Install it as your login user, not with sudo:
+#
+#   mkdir -p ~/.config/labwc
+#   cp /etc/xdg/labwc/autostart ~/.config/labwc/autostart   # if the system one exists
+#   nano ~/.config/labwc/autostart                          # append the lines below
+#   chmod 644 ~/.config/labwc/autostart
+#
+# Permissions: 644 on the file, 755 on ~/.config/labwc, owned by you. labwc
+# runs this through `sh`, so it does not need the execute bit.
+#
+# IMPORTANT: a user autostart REPLACES /etc/xdg/labwc/autostart, it does not
+# add to it. On Pi OS the system file is what starts the desktop panel and
+# wallpaper, so copy it first unless you want a bare kiosk screen.
 
-# 2. Start the kiosk browser.
+# 1. Set the display mode BEFORE the browser starts, and do not background it -
+#    Chromium sizes its window at launch, so a mode change still in flight is a
+#    race you lose intermittently.
+#
+#    Touch Display 2 (natively portrait, rotated into landscape):
+# wlr-randr --output DSI-1 --transform 90
+#
+#    A bar display whose native mode is missing from the EDID. Check the output
+#    name with `wlr-randr` first; the Pi 5 has HDMI-A-1 and HDMI-A-2:
+# wlr-randr --output HDMI-A-1 --custom-mode 1280x400@60
+
+# 2. Start the kiosk browser. This one is backgrounded so labwc can carry on.
 /opt/unifi-dashboard/deploy/kiosk.sh &
 
 # Screen blanking is a separate setting, not something to script here:
