@@ -124,12 +124,26 @@ equivalent goes in `~/.config/wayfire.ini` under `[autostart]`.
 
 ## Running it without a controller
 
+The dependencies have to exist first, so either use the virtualenv that
+`deploy/install.sh` created:
+
 ```bash
-python3 -m unifi_dashboard --demo
+/opt/unifi-dashboard/.venv/bin/python -m unifi_dashboard --demo
 ```
 
-Serves synthetic data on <http://127.0.0.1:8787/> with an hour of history
-already in the graph. This is how the UI was built and is the fastest way to
+or, to try it before installing anything, make one in the checkout:
+
+```bash
+python3 -m venv .venv
+.venv/bin/pip install -r requirements.txt
+.venv/bin/python -m unifi_dashboard --demo
+```
+
+Either serves synthetic data on <http://127.0.0.1:8787/> with an hour of
+history already in the graph. Plain `python3 -m unifi_dashboard` uses the
+system interpreter, which has none of the dependencies - and on current Pi OS
+cannot be given them, since PEP 668 blocks installing into the system
+environment. This is how the UI was built and is the fastest way to
 try layout changes.
 
 ## Configuration

@@ -15,7 +15,27 @@ fi
 
 echo "==> installing system packages"
 apt-get update -qq
-apt-get install -y -qq python3-venv python3-pip iputils-ping chromium-browser unclutter
+
+# Required. A failure here should stop the install.
+apt-get install -y -qq python3-venv python3-pip iputils-ping rsync
+
+# Optional, and named differently across Pi OS releases - Bookworm has
+# chromium-browser, newer images have chromium. A missing kiosk browser must
+# not abort the install of the service itself, which is useful on its own.
+browser=""
+for pkg in chromium chromium-browser; do
+  if apt-get install -y -qq "$pkg" >/dev/null 2>&1; then
+    browser="$pkg"
+    break
+  fi
+done
+if [ -n "$browser" ]; then
+  echo "    kiosk browser: $browser"
+else
+  echo "    no chromium package found - install one before using deploy/kiosk.sh"
+fi
+apt-get install -y -qq unclutter >/dev/null 2>&1 \
+  || echo "    unclutter unavailable - the mouse pointer will not auto-hide"
 
 echo "==> copying source to $APP_DIR"
 mkdir -p "$APP_DIR"
@@ -42,6 +62,12 @@ if [ ! -f "$CONFIG_DIR/config.toml" ]; then
   echo "    wrote $CONFIG_DIR/config.toml - edit it before starting the service"
 else
   echo "    $CONFIG_DIR/config.toml already exists, left untouched"
+fi
+
+echo "==> verifying the virtualenv"
+if ! "$APP_DIR/.venv/bin/python" -c "import fastapi, uvicorn, httpx" 2>/dev/null; then
+  echo "ERROR: dependencies are missing from $APP_DIR/.venv - see the pip output above" >&2
+  exit 1
 fi
 
 echo "==> systemd unit"
