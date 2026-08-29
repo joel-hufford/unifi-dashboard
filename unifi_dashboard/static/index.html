@@ -9,31 +9,14 @@
 <link rel="stylesheet" href="/static/styles.css">
 </head>
 <body>
+<!-- Drawn over everything when something is wrong. Sized to be unmistakable
+     from across a room, which is the whole point of the panel. -->
+<div class="alarm-frame" id="alarm-frame" aria-hidden="true"></div>
+
 <div class="viz-root" id="app">
 
   <header class="topbar">
-    <div class="wan-identity">
-      <span class="status-dot" id="wan-dot" data-state="unknown" aria-hidden="true"></span>
-      <div class="field">
-        <span class="field-label">WAN</span>
-        <span class="field-value" id="wan-state" aria-live="polite">Connecting…</span>
-      </div>
-    </div>
-
-    <div class="field">
-      <span class="field-label">Public IP</span>
-      <span class="field-value mono" id="wan-ip">—</span>
-    </div>
-
-    <div class="field hide-narrow">
-      <span class="field-label">ISP</span>
-      <span class="field-value" id="wan-isp">—</span>
-    </div>
-
-    <div class="field hide-narrow">
-      <span class="field-label">WAN uptime</span>
-      <span class="field-value" id="wan-uptime">—</span>
-    </div>
+    <div class="wan-chips" id="wan-chips" role="group" aria-label="WAN links"></div>
 
     <div class="topbar-spacer"></div>
 
@@ -57,21 +40,41 @@
 
   <main class="layout">
 
-    <section class="kpis" aria-label="Headline metrics">
-      <article class="tile">
-        <h2 class="tile-label">Latency to <span id="kpi-ping-target">8.8.8.8</span></h2>
-        <p class="tile-value"><span id="kpi-latency">—</span><span class="unit">ms</span></p>
-        <p class="tile-sub" id="kpi-latency-sub">to 8.8.8.8</p>
-      </article>
+    <section class="card wan-hero" aria-label="WAN status">
+      <div class="hero-head">
+        <span class="hero-label" id="hero-label">WAN</span>
+        <span class="badge" id="hero-badge" hidden>Cellular</span>
+      </div>
 
-      <article class="tile">
-        <h2 class="tile-label">Packet loss</h2>
-        <p class="tile-value">
-          <span class="status-mark" id="kpi-loss-mark" data-status="good" aria-hidden="true"></span><span id="kpi-loss">—</span><span class="unit">%</span>
-        </p>
-        <p class="tile-sub" id="kpi-loss-sub">—</p>
-      </article>
+      <p class="hero-state">
+        <span class="lamp lamp-lg" id="hero-lamp" data-state="unknown" aria-hidden="true"></span>
+        <span id="hero-state-word">Connecting…</span>
+      </p>
 
+      <p class="hero-ip mono" id="hero-ip">—</p>
+
+      <div class="checks">
+        <div class="check">
+          <span class="lamp" id="check-net-lamp" data-state="unknown" aria-hidden="true"></span>
+          <span class="check-name">Internet</span>
+          <span class="check-value" id="check-net-value">—</span>
+        </div>
+        <div class="check">
+          <span class="lamp" id="check-dns-lamp" data-state="unknown" aria-hidden="true"></span>
+          <span class="check-name">DNS</span>
+          <span class="check-value" id="check-dns-value">—</span>
+        </div>
+        <div class="check">
+          <span class="lamp" id="check-loss-lamp" data-state="unknown" aria-hidden="true"></span>
+          <span class="check-name">Packet loss</span>
+          <span class="check-value" id="check-loss-value">—</span>
+        </div>
+      </div>
+
+      <p class="hero-foot" id="hero-foot">—</p>
+    </section>
+
+    <section class="kpis" aria-label="Network counts">
       <article class="tile">
         <h2 class="tile-label">Connected devices</h2>
         <p class="tile-value" id="kpi-clients">—</p>

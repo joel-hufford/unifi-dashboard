@@ -11,6 +11,7 @@
 
   const state = {
     minutes: 60,
+    selectedWan: null,      // null = follow whichever link is active
     data: null,
     geometry: new Map(),   // panel id -> { x(i), y(v), plot box, count }
     hoverIndex: null,
@@ -76,7 +77,12 @@
     try {
       const response = await fetch(`/api/dashboard?minutes=${state.minutes}`, { cache: "no-store" });
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
-      state.data = await response.json();
+      const payload = await response.json();
+      const first = state.data === null;
+      state.data = payload;
+      if (first && payload.config && payload.config.theme) {
+        document.documentElement.dataset.theme = payload.config.theme;
+      }
       render();
     } catch (error) {
       showBanner("critical", `Dashboard server unreachable (${error.message})`);
@@ -96,8 +102,9 @@
   function render() {
     const data = state.data;
     if (!data) return;
-    renderBanner(data);
-    renderTopbar(data);
+    renderAlarm(data);
+    renderWanChips(data);
+    renderHero(data);
     renderKpis(data);
     renderCharts(data);
     renderWlan(data);
@@ -111,55 +118,144 @@
     banner.textContent = text;
   }
 
-  function renderBanner(data) {
+  function renderAlarm(data) {
     const banner = $("banner");
-    const wan = data.wan || {};
-    if (!data.ok) {
+    const frame = $("alarm-frame");
+    const alarm = data.alarm || {};
+    const level = !data.ok ? (alarm.level || "warning") : (alarm.level || "ok");
+
+    frame.dataset.level = level;
+
+    if (level === "ok") {
+      banner.hidden = true;
+      return;
+    }
+
+    // The headline is the most fundamental failure, not the most recent one.
+    const reasons = (alarm.reasons || []).slice();
+    if (!data.ok && data.error) {
       const seen = data.generated_at ? clockText(new Date(data.generated_at * 1000)) : "never";
-      showBanner("critical", `Controller unreachable — showing the last good reading from ${seen}. ${data.error || ""}`.trim());
-      return;
+      reasons.push(`last good reading ${seen}`);
     }
-    if (wan.online === false) {
-      showBanner("critical", "WAN is down — the gateway has no internet connection.");
-      return;
-    }
-    if (wan.reachable === false) {
-      showBanner("critical", `No reply from ${wan.ping_target || "the internet"} — the WAN link is up but traffic is not passing.`);
-      return;
-    }
-    if (data.stale_s != null && data.stale_s > (data.poll_interval || 10) * 3) {
-      showBanner("warning", `Data is ${Math.round(data.stale_s)}s old — the controller is slow to answer.`);
-      return;
-    }
-    banner.hidden = true;
+    banner.hidden = false;
+    banner.dataset.status = level;
+    banner.textContent = reasons.join(" · ") || "Something is wrong";
   }
 
-  function renderTopbar(data) {
+  const LINK_STATE = (link) =>
+    !link ? "unknown" : !link.up ? "critical" : link.active ? "ok" : "idle";
+
+  function selectedLink(data) {
+    const links = data.wan_links || [];
+    if (!links.length) return null;
+    if (state.selectedWan) {
+      const chosen = links.find((link) => link.key === state.selectedWan);
+      if (chosen) return chosen;
+    }
+    return links.find((link) => link.active) || links[0];
+  }
+
+  function renderWanChips(data) {
+    const host = $("wan-chips");
+    const links = data.wan_links || [];
+    const current = selectedLink(data);
+    host.replaceChildren();
+
+    if (!links.length) {
+      const fallback = document.createElement("span");
+      fallback.className = "wan-chip";
+      const lamp = document.createElement("span");
+      lamp.className = "lamp";
+      lamp.dataset.state = data.wan?.online ? "ok" : "critical";
+      const label = document.createElement("span");
+      label.textContent = "WAN";
+      fallback.append(lamp, label);
+      host.appendChild(fallback);
+      return;
+    }
+
+    for (const link of links) {
+      const chip = document.createElement("button");
+      chip.type = "button";
+      chip.className = "wan-chip";
+      chip.setAttribute("aria-pressed", String(current != null && link.key === current.key));
+
+      const lamp = document.createElement("span");
+      lamp.className = "lamp";
+      lamp.dataset.state = LINK_STATE(link);
+
+      const label = document.createElement("span");
+      label.textContent = link.label || link.key.toUpperCase();
+
+      const note = document.createElement("span");
+      note.className = "chip-note";
+      note.textContent = !link.up ? "down" : link.active ? "active" : "standby";
+
+      chip.append(lamp, label, note);
+      chip.addEventListener("click", () => {
+        state.selectedWan = link.key;
+        render();
+      });
+      host.appendChild(chip);
+    }
+  }
+
+  function renderHero(data) {
+    const link = selectedLink(data);
     const wan = data.wan || {};
-    $("wan-dot").dataset.state = !data.ok ? "warning" : wan.online ? "up" : "down";
-    $("wan-state").textContent = !data.ok ? "Unknown" : wan.online ? "Online" : "Offline";
-    $("wan-ip").textContent = wan.ip || "—";
-    $("wan-isp").textContent = wan.isp || "—";
-    $("wan-uptime").textContent = duration(wan.uptime_s);
+    const win = data.window || {};
+    const dns = data.dns || {};
+    const viewingActive = !link || link.active;
+
+    $("hero-label").textContent = link ? (link.label || link.key.toUpperCase()) : "WAN";
+    $("hero-badge").hidden = !(link && link.cellular);
+
+    const lamp = $("hero-lamp");
+    lamp.dataset.state = LINK_STATE(link);
+    $("hero-state-word").textContent = !link
+      ? (wan.online ? "Online" : "Offline")
+      : !link.up ? "Offline" : link.active ? "Online" : "Standby";
+
+    $("hero-ip").textContent = (link ? link.ip : wan.ip) || "no address";
+
+    // The ICMP and DNS probes run from the Pi, so they describe whichever link
+    // is actually carrying traffic - never a standby one. Say so rather than
+    // implying the numbers belong to the link being viewed.
+    const netLamp = $("check-net-lamp");
+    const dnsLamp = $("check-dns-lamp");
+    const lossLamp = $("check-loss-lamp");
+
+    if (!viewingActive) {
+      for (const el of [netLamp, dnsLamp, lossLamp]) el.dataset.state = "idle";
+      $("check-net-value").textContent = "—";
+      $("check-dns-value").textContent = "—";
+      $("check-loss-value").textContent = "—";
+      $("hero-foot").textContent =
+        `Standby link · uptime ${duration(link && link.uptime_s)} · checks below run over the active WAN`;
+      return;
+    }
+
+    netLamp.dataset.state = wan.reachable === false ? "critical" : wan.reachable ? "ok" : "unknown";
+    $("check-net-value").textContent =
+      wan.reachable === false ? "no reply" : `${ms(wan.latency_ms)} ms`;
+
+    dnsLamp.dataset.state = dns.ok === false ? "critical" : dns.ok ? "ok" : "unknown";
+    $("check-dns-value").textContent =
+      dns.ok === false ? "failing" : dns.elapsed_ms == null ? "—" : `${ms(dns.elapsed_ms, 0)} ms`;
+
+    const loss = win.loss_pct;
+    lossLamp.dataset.state = lossStatus(loss) === "good" ? "ok" : lossStatus(loss);
+    $("check-loss-value").textContent = loss == null ? "—" : `${loss.toFixed(loss >= 10 ? 0 : 1)}%`;
+
+    const parts = [`uptime ${duration(link ? link.uptime_s : wan.uptime_s)}`];
+    if (link && link.isp) parts.push(link.isp);
+    parts.push(`${wan.ping_target || "8.8.8.8"} · ${dns.host || "dns"}`);
+    $("hero-foot").textContent = parts.join(" · ");
   }
 
   function renderKpis(data) {
-    const wan = data.wan || {};
-    const win = data.window || {};
     const clients = data.clients || {};
     const wlan = data.wlan || {};
-
-    $("kpi-ping-target").textContent = wan.ping_target || "8.8.8.8";
-    $("kpi-latency").textContent = ms(wan.latency_ms);
-    // Non-breaking space so a narrow tile never wraps "ms" onto its own line.
-    $("kpi-latency-sub").textContent =
-      `avg ${ms(win.avg_latency_ms)} · min ${ms(win.min_latency_ms)} · max ${ms(win.max_latency_ms)}\u00a0ms`;
-
-    const loss = win.loss_pct;
-    $("kpi-loss").textContent = loss == null ? "—" : loss.toFixed(loss >= 10 ? 0 : 1);
-    $("kpi-loss-mark").dataset.status = lossStatus(loss);
-    $("kpi-loss-sub").textContent =
-      win.packets_sent ? `${num(win.packets_lost)} of ${num(win.packets_sent)} packets lost` : "no probes yet";
 
     $("kpi-clients").textContent = num(clients.total);
     $("kpi-clients-sub").textContent =
@@ -172,7 +268,10 @@
     const meter = $("kpi-wlan-meter");
     meter.style.setProperty("--meter-color", `var(--${band.token})`);
     $("kpi-wlan-fill").style.width = `${score == null ? 0 : Math.max(2, Math.min(100, score))}%`;
-    meter.setAttribute("aria-label", `Wi-Fi quality score ${score == null ? "unknown" : Math.round(score)} out of 100, ${band.label}`);
+    meter.setAttribute(
+      "aria-label",
+      `Wi-Fi quality score ${score == null ? "unknown" : Math.round(score)} out of 100, ${band.label}`,
+    );
     $("kpi-wlan-sub").textContent =
       wlan.rated ? `${wlan.weak} weak of ${wlan.rated} clients · mean ${ms(wlan.mean_signal_dbm, 0)} dBm` : "no wireless clients";
   }
@@ -682,24 +781,15 @@
 
   /* ------------------------------------------------------------------ init */
 
+  // Deliberately not persisted. On a wall panel the toggle is easy to catch
+  // by accident, and a display that quietly stays in the wrong theme until
+  // someone notices is worse than one that reverts on the next refresh.
   function setTheme(theme) {
     document.documentElement.dataset.theme = theme;
-    try {
-      localStorage.setItem("unifi-dashboard-theme", theme);
-    } catch (error) {
-      void error;                             // private mode: not worth failing over
-    }
     render();
   }
 
   function init() {
-    let stored = "dark";
-    try {
-      stored = localStorage.getItem("unifi-dashboard-theme") || "dark";
-    } catch (error) {
-      void error;
-    }
-    document.documentElement.dataset.theme = stored;
 
     for (const button of document.querySelectorAll(".range button")) {
       button.addEventListener("click", () => {

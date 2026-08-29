@@ -7,9 +7,18 @@ import logging
 import time
 from dataclasses import asdict
 
+from . import alarm as alarm_rules
 from .config import Config
 from .demo import DemoSource, seed_history
-from .metrics import clients_from, devices_from, wan_from, wlan_quality_from
+from .dnsprobe import DnsResult, resolve
+from .metrics import (
+    active_link,
+    clients_from,
+    devices_from,
+    wan_from,
+    wan_links_from,
+    wlan_quality_from,
+)
 from .ping import PingResult, ping
 from .storage import History
 
@@ -21,7 +30,7 @@ class Poller:
         self.cfg = cfg
         self.store = store
         self.client = client
-        self.demo = DemoSource() if cfg.demo else None
+        self.demo = DemoSource(fault=cfg.demo_fault) if cfg.demo else None
         self.snapshot: dict = {"ok": False, "error": "starting up", "generated_at": None}
         self.last_success: float | None = None
         self._task: asyncio.Task | None = None
@@ -29,6 +38,8 @@ class Poller:
         # Kept so a rate can be differenced from cumulative counters when the
         # firmware does not report the "-r" instantaneous fields.
         self._prev_counters: tuple[float, float, float] | None = None
+        # Keeps the last raw controller payloads for /api/debug/raw.
+        self.last_raw: dict[str, list[dict]] = {}
 
     # -- lifecycle --------------------------------------------------------
 
@@ -72,15 +83,22 @@ class Poller:
 
     async def tick(self) -> dict:
         now = time.time()
+        # The two probes and the controller fetch talk to different places,
+        # so they run together.
         probe_task = asyncio.create_task(self._probe())
+        dns_task = asyncio.create_task(self._resolve())
         try:
             raw = await self._fetch()
         except BaseException:
             probe_task.cancel()
+            dns_task.cancel()
             raise
         probe = await probe_task
+        dns = await dns_task
+        self.last_raw = raw
 
         wan = wan_from(raw["health"], raw["devices"])
+        links = wan_links_from(raw["health"], raw["devices"])
         clients = clients_from(raw["clients"])
         devices = devices_from(raw["devices"])
         wlan = wlan_quality_from(raw["clients"], weak_signal_dbm=self.cfg.wlan.weak_signal_dbm)
@@ -98,7 +116,23 @@ class Poller:
                 "clients": clients.total,
                 "wlan_score": wlan.score,
                 "wan_up": wan.online,
+                "dns_ok": dns.ok,
+                "dns_ms": dns.elapsed_ms,
             }
+        )
+
+        current = active_link(links)
+        on_backup = bool(current and current is not links[0] and current.active)
+
+        state = alarm_rules.evaluate(
+            self.cfg.alarm,
+            controller_ok=True,
+            wan_up=wan.online,
+            internet_reachable=probe.reachable,
+            dns_ok=dns.ok,
+            loss_pct=probe.loss_pct,
+            latency_ms=probe.avg_ms,
+            on_backup=on_backup,
         )
 
         self.last_success = now
@@ -106,6 +140,9 @@ class Poller:
             "ok": True,
             "error": None,
             "generated_at": now,
+            "alarm": asdict(state),
+            "dns": asdict(dns),
+            "wan_links": [asdict(link) for link in links],
             "wan": {
                 **asdict(wan),
                 "rx_bps": rx_bps,
@@ -135,6 +172,11 @@ class Poller:
             return self.demo.ping(self.cfg.ping.count)
         return await ping(self.cfg.ping)
 
+    async def _resolve(self) -> DnsResult:
+        if self.demo is not None:
+            return self.demo.dns(self.cfg.dns.probe_host)
+        return await resolve(self.cfg.dns)
+
     def _rates(self, wan, now: float) -> tuple[float | None, float | None]:
         """Prefer the controller's instantaneous rate; difference the counters
         when it is not reported."""
@@ -161,10 +203,22 @@ class Poller:
         return (wan.rx_bytes - prev_rx) / elapsed, (wan.tx_bytes - prev_tx) / elapsed
 
     def _record_failure(self, message: str) -> None:
+        # A poll failure tells us nothing about the WAN itself, so the alarm
+        # says exactly that rather than claiming an outage we cannot see.
+        state = alarm_rules.evaluate(
+            self.cfg.alarm,
+            controller_ok=False,
+            wan_up=None,
+            internet_reachable=None,
+            dns_ok=None,
+            loss_pct=None,
+            latency_ms=None,
+        )
         self.snapshot = {
             **self.snapshot,
             "ok": False,
             "error": message,
+            "alarm": asdict(state),
             "last_success": self.last_success,
         }
 
@@ -180,6 +234,7 @@ class Poller:
         snapshot["window"] = summary
         snapshot["series"] = {
             "ts": [row["ts"] for row in rows],
+            "dns_ok": [row["dns_ok"] for row in rows],
             "rx_bps": [row["rx_bps"] for row in rows],
             "tx_bps": [row["tx_bps"] for row in rows],
             "latency_ms": [row["latency_ms"] for row in rows],

@@ -16,6 +16,8 @@ shrinking:
 | Metric | Where it comes from |
 |---|---|
 | WAN status and public IP | controller health + the gateway's WAN interface |
+| Per-WAN status, including a cellular backup | every `wanN` slot on the gateway |
+| Whether DNS resolves | a name lookup from the Pi each poll |
 | Latency to 8.8.8.8 (now, avg, min, max) | `ping` run **from the Pi**, not the controller |
 | WAN packet loss over the window | the same probe, aggregated across the window |
 | Connected devices, split Wi-Fi / wired / guest | `stat/sta` |
@@ -32,6 +34,46 @@ The graph window is switchable (15m / 1h / 3h) and scopes every number on the
 page, so the averages always agree with the plots. Tapping a chart shows a
 crosshair with all three series at that moment, and the `Table` button swaps
 the plots for the same data in five-minute buckets.
+
+## The alarm state
+
+The panel's first job is to answer "is the internet working" from across the
+room, so a fault draws a border around the whole screen - amber for degraded,
+red and pulsing for broken - with the reason on a banner. The rules live in
+`alarm.py`:
+
+| State | Trigger |
+|---|---|
+| **critical** | WAN down · no reply from the ping target · DNS not resolving · loss or latency past the critical threshold |
+| **warning** | loss or latency past the warning threshold · running on the backup WAN · controller unreachable |
+
+An unreachable controller is deliberately only a warning: it means we cannot
+*see* the WAN, which is not the same as the WAN being down.
+
+Thresholds are in the `[alarm]` section of the config. To see the states
+without breaking anything:
+
+```bash
+python -m unifi_dashboard --demo-fault dns        # or wan-down, loss, latency, failover
+```
+
+## Dual WAN
+
+UniFi gateways expose each uplink separately, so a primary plus a cellular
+backup both appear as chips in the top bar with their own status lamp - active,
+standby or down. Tapping one shows that link's detail in the WAN card.
+
+Slots are discovered rather than assumed: numbering is not contiguous in the
+wild, and a cellular backup commonly reports as `wan3` with no `wan2`. Cellular
+links are recognised from the interface name and labelled as such.
+
+Note that the internet and DNS checks are measured **from the Pi**, so they
+describe whichever link is carrying traffic. Select a standby link and those
+checks read as unavailable rather than pretending to describe it.
+
+If a WAN is detected wrongly, `GET /api/debug/wan` returns the gateway's WAN
+interfaces exactly as the controller reported them - uplink detail only, no
+client names or MAC addresses - which is the payload to share when reporting it.
 
 ## Display layouts
 

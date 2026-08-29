@@ -46,6 +46,34 @@ class PingConfig:
 
 
 @dataclass
+class UiConfig:
+    # The theme the panel starts in. The on-screen toggle only changes the
+    # current session, so a stray touch on a wall panel corrects itself on the
+    # next refresh rather than leaving the display light until someone notices.
+    theme: str = "dark"
+
+
+@dataclass
+class DnsConfig:
+    # Resolved every poll to prove name resolution works, not just routing.
+    probe_host: str = "cloudflare.com"
+    timeout: float = 2.0
+
+
+@dataclass
+class AlarmConfig:
+    """Thresholds that decide when the screen shouts."""
+
+    loss_pct_warning: float = 2.0
+    loss_pct_critical: float = 10.0
+    latency_ms_warning: float = 150.0
+    latency_ms_critical: float = 400.0
+    # Running on the backup WAN is not an outage, but on a metered cellular
+    # link it is something you want to notice the same day it happens.
+    failover_is_critical: bool = False
+
+
+@dataclass
 class ServerConfig:
     host: str = "127.0.0.1"
     port: int = 8787
@@ -70,8 +98,12 @@ class WlanConfig:
 class Config:
     poll_interval: float = 10.0
     demo: bool = False
+    demo_fault: str = "none"
     unifi: UniFiConfig = field(default_factory=UniFiConfig)
     ping: PingConfig = field(default_factory=PingConfig)
+    dns: DnsConfig = field(default_factory=DnsConfig)
+    ui: UiConfig = field(default_factory=UiConfig)
+    alarm: AlarmConfig = field(default_factory=AlarmConfig)
     server: ServerConfig = field(default_factory=ServerConfig)
     history: HistoryConfig = field(default_factory=HistoryConfig)
     wlan: WlanConfig = field(default_factory=WlanConfig)
@@ -128,6 +160,9 @@ def _from_mapping(cls, data: dict):
 _NESTED = {
     "unifi": UniFiConfig,
     "ping": PingConfig,
+    "dns": DnsConfig,
+    "ui": UiConfig,
+    "alarm": AlarmConfig,
     "server": ServerConfig,
     "history": HistoryConfig,
     "wlan": WlanConfig,

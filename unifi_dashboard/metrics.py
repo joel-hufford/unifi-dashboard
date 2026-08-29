@@ -8,6 +8,7 @@ takes the first one that is actually present.
 
 from __future__ import annotations
 
+import re
 from dataclasses import asdict, dataclass, field
 
 # A client at or above this signal is as good as it gets; at or below the floor
@@ -82,24 +83,6 @@ def find_gateway(devices: list[dict]) -> dict | None:
     return None
 
 
-def wan_interface(gateway: dict | None) -> dict | None:
-    """The active WAN interface sub-object, whichever slot it lives in."""
-    if not isinstance(gateway, dict):
-        return None
-    for key in ("wan1", "wan2", "uplink"):
-        candidate = gateway.get(key)
-        if isinstance(candidate, dict) and candidate:
-            # wan2 only counts when wan1 was absent; a failed-over link still
-            # reports up, so prefer whichever one says it is up.
-            if candidate.get("up") is not False:
-                return candidate
-    for key in ("wan1", "wan2", "uplink"):
-        candidate = gateway.get(key)
-        if isinstance(candidate, dict) and candidate:
-            return candidate
-    return None
-
-
 # --------------------------------------------------------------------------
 # dataclasses
 
@@ -119,6 +102,26 @@ class WanStatus:
     speedtest_up_mbps: float | None = None
     speedtest_ping_ms: float | None = None
     speedtest_ts: float | None = None
+
+
+@dataclass
+class WanLink:
+    """One WAN interface. A UniFi gateway usually has two: the primary and a
+    backup, often cellular."""
+
+    key: str                              # "wan1", "wan2"
+    label: str                            # "WAN 1", or the network group name
+    up: bool = False
+    active: bool = False                  # the link currently carrying traffic
+    cellular: bool = False
+    ip: str | None = None
+    isp: str | None = None
+    uptime_s: float | None = None
+    latency_ms: float | None = None
+    rx_bps: float | None = None
+    tx_bps: float | None = None
+    rx_bytes: float | None = None
+    tx_bytes: float | None = None
 
 
 @dataclass
@@ -161,40 +164,124 @@ class WlanQuality:
     worst: list[ClientQuality] = field(default_factory=list)
 
 
+# WAN slots are discovered rather than assumed: numbering is not contiguous
+# in the wild - a gateway with a cellular backup commonly reports wan1 and
+# wan3 with no wan2 at all.
+_WAN_KEY = re.compile(r"^wan(\d+)$")
+
+# A cellular uplink shows up under different names across firmware versions,
+# so match on several: the interface name is the most reliable signal.
+_CELLULAR_HINTS = ("wwan", "ppp", "lte", "cellular", "5g", "modem")
+
+
+def is_cellular(iface: dict | None) -> bool:
+    if not isinstance(iface, dict):
+        return False
+    for key in ("ifname", "type", "media", "wan_type", "comment", "name"):
+        value = iface.get(key)
+        if isinstance(value, str) and any(hint in value.lower() for hint in _CELLULAR_HINTS):
+            return True
+    return False
+
+
+def wan_links_from(health: list[dict], devices: list[dict]) -> list[WanLink]:
+    """Every WAN the gateway exposes, with the active one flagged.
+
+    ``stat/health`` only ever describes the uplink currently in use, so the
+    per-interface detail has to come off the gateway device itself.
+    """
+    gateway = find_gateway(devices)
+    subsystems = index_health(health)
+    active_ip = _first_str(subsystems.get("wan", {}), "wan_ip")
+
+    slots: list[tuple[int, str]] = []
+    if isinstance(gateway, dict):
+        for key in gateway:
+            match = _WAN_KEY.match(key)
+            if match and isinstance(gateway.get(key), dict) and gateway[key]:
+                slots.append((int(match.group(1)), key))
+    slots.sort()
+
+    links: list[WanLink] = []
+    for number, key in slots:
+        iface = gateway[key]
+        links.append(
+            WanLink(
+                key=key,
+                label=_first_str(iface, "wan_networkgroup", "name") or f"WAN {number}",
+                up=bool(iface.get("up")),
+                cellular=is_cellular(iface),
+                ip=_first_str(iface, "ip"),
+                isp=_first_str(iface, "isp_name", "isp_organization"),
+                uptime_s=_first_num(iface, "uptime"),
+                latency_ms=_first_num(iface, "latency"),
+                rx_bps=_first_num(iface, "rx_bytes-r"),
+                tx_bps=_first_num(iface, "tx_bytes-r"),
+                rx_bytes=_first_num(iface, "rx_bytes"),
+                tx_bytes=_first_num(iface, "tx_bytes"),
+            )
+        )
+
+    if not links:
+        return links
+
+    # The active link is the one whose address the controller reports as *the*
+    # WAN address; failing that, the first one that is up.
+    chosen = next((l for l in links if active_ip and l.ip == active_ip), None)
+    if chosen is None:
+        chosen = next((l for l in links if l.up), links[0])
+    chosen.active = True
+    return links
+
+
+def active_link(links: list[WanLink]) -> WanLink | None:
+    return next((link for link in links if link.active), links[0] if links else None)
+
+
 # --------------------------------------------------------------------------
 # extractors
 
 
 def wan_from(health: list[dict], devices: list[dict]) -> WanStatus:
+    """The active WAN, flattened.
+
+    Interface detail comes from whichever link ``wan_links_from`` considers
+    active, so this stays correct when the gateway fails over to a backup -
+    including one in a non-contiguous slot such as wan3.
+    """
     subsystems = index_health(health)
     wan = subsystems.get("wan", {})
     www = subsystems.get("www", {})
-    gateway = find_gateway(devices)
-    iface = wan_interface(gateway)
+    links = wan_links_from(health, devices)
+    current = active_link(links)
 
     status = WanStatus()
 
     wan_state = wan.get("status") or www.get("status")
     if wan_state:
         status.online = str(wan_state).lower() == "ok"
-    elif iface is not None:
-        status.online = bool(iface.get("up"))
+    elif current is not None:
+        status.online = current.up
 
-    status.ip = _first_str(wan, "wan_ip") or _first_str(iface, "ip") or _first_str(www, "wan_ip")
+    status.ip = _first_str(wan, "wan_ip") or (current.ip if current else None) or _first_str(www, "wan_ip")
     status.isp = (
         _first_str(www, "isp_name", "isp_organization")
-        or _first_str(iface, "isp_name", "isp_organization")
+        or (current.isp if current else None)
     )
-    status.uptime_s = _first_num(www, "uptime") or _first_num(wan, "uptime") or _first_num(iface, "uptime")
+    status.uptime_s = (
+        _first_num(www, "uptime")
+        or _first_num(wan, "uptime")
+        or (current.uptime_s if current else None)
+    )
     status.gateway_latency_ms = _first_num(www, "latency", "speedtest_ping")
 
     # Instantaneous rates, if the firmware reports them.
-    status.rx_bps = _first_num(iface, "rx_bytes-r") or _first_num(wan, "rx_bytes-r") or _first_num(www, "rx_bytes-r")
-    status.tx_bps = _first_num(iface, "tx_bytes-r") or _first_num(wan, "tx_bytes-r") or _first_num(www, "tx_bytes-r")
+    status.rx_bps = (current.rx_bps if current else None) or _first_num(wan, "rx_bytes-r") or _first_num(www, "rx_bytes-r")
+    status.tx_bps = (current.tx_bps if current else None) or _first_num(wan, "tx_bytes-r") or _first_num(www, "tx_bytes-r")
 
     # Cumulative counters, so the poller can difference them when it has to.
-    status.rx_bytes = _first_num(iface, "rx_bytes") or _first_num(wan, "rx_bytes")
-    status.tx_bytes = _first_num(iface, "tx_bytes") or _first_num(wan, "tx_bytes")
+    status.rx_bytes = (current.rx_bytes if current else None) or _first_num(wan, "rx_bytes")
+    status.tx_bytes = (current.tx_bytes if current else None) or _first_num(wan, "tx_bytes")
 
     status.speedtest_down_mbps = _first_num(www, "xput_down")
     status.speedtest_up_mbps = _first_num(www, "xput_up")

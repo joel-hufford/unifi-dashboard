@@ -17,6 +17,12 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--host", help="bind address (overrides config)")
     parser.add_argument("--port", type=int, help="bind port (overrides config)")
     parser.add_argument("--demo", action="store_true", help="serve synthetic data, no controller needed")
+    parser.add_argument(
+        "--demo-fault",
+        choices=("none", "wan-down", "dns", "loss", "latency", "failover"),
+        default="none",
+        help="with --demo, inject a fault so the alarm states can be seen",
+    )
     parser.add_argument("-v", "--verbose", action="store_true", help="debug logging")
     args = parser.parse_args(argv)
 
@@ -26,8 +32,9 @@ def main(argv: list[str] | None = None) -> int:
     )
 
     cfg = Config.load(args.config)
-    if args.demo:
+    if args.demo or args.demo_fault != "none":
         cfg.demo = True
+    cfg.demo_fault = args.demo_fault
     if args.host:
         cfg.server.host = args.host
     if args.port:

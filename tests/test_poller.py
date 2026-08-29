@@ -64,11 +64,52 @@ async def test_dashboard_payload_has_the_shape_the_page_reads():
     await poller.tick()
     payload = poller.dashboard(60)
 
-    for key in ("wan", "clients", "devices", "wlan", "window", "series", "stale_s"):
+    for key in ("wan", "clients", "devices", "wlan", "window", "series", "stale_s",
+                "wan_links", "alarm", "dns"):
         assert key in payload
     series = payload["series"]
-    assert set(series) == {"ts", "rx_bps", "tx_bps", "latency_ms", "loss_pct"}
+    assert set(series) == {"ts", "rx_bps", "tx_bps", "latency_ms", "loss_pct", "dns_ok"}
     assert len({len(values) for values in series.values()}) == 1  # parallel arrays
+
+
+@pytest.mark.asyncio
+async def test_demo_reports_both_wan_links_with_the_primary_active():
+    snapshot = await make_poller().tick()
+    links = snapshot["wan_links"]
+
+    assert [link["key"] for link in links] == ["wan1", "wan3"]
+    assert links[0]["active"] is True and links[0]["cellular"] is False
+    assert links[1]["active"] is False and links[1]["cellular"] is True
+    assert snapshot["alarm"]["level"] == "ok"
+
+
+@pytest.mark.asyncio
+async def test_failover_moves_the_active_flag_and_raises_a_warning():
+    poller = make_poller()
+    poller.demo.fault = "failover"
+    snapshot = await poller.tick()
+
+    primary, backup = snapshot["wan_links"]
+    assert primary["up"] is False and primary["active"] is False
+    assert backup["active"] is True
+
+    assert snapshot["alarm"]["level"] == "warning"
+    assert "Running on the backup WAN" in snapshot["alarm"]["reasons"]
+    # Throughput has to follow the link that is actually carrying traffic.
+    assert snapshot["wan"]["rx_bps"] > 0
+    assert snapshot["wan"]["ip"] == backup["ip"]
+
+
+@pytest.mark.asyncio
+async def test_dns_failure_is_critical_even_while_the_wan_is_up():
+    poller = make_poller()
+    poller.demo.fault = "dns"
+    snapshot = await poller.tick()
+
+    assert snapshot["dns"]["ok"] is False
+    assert snapshot["wan"]["online"] is True      # routing is fine
+    assert snapshot["alarm"]["level"] == "critical"
+    assert snapshot["alarm"]["reasons"][0] == "DNS is not resolving"
 
 
 @pytest.mark.asyncio
@@ -79,5 +120,8 @@ async def test_a_failed_poll_keeps_the_last_good_snapshot():
 
     assert poller.snapshot["ok"] is False
     assert poller.snapshot["error"] == "controller timed out"
+    # A poll failure says nothing about the WAN, so it must not claim an outage.
+    assert poller.snapshot["alarm"]["level"] == "warning"
+    assert poller.snapshot["alarm"]["reasons"] == ["Controller unreachable"]
     # The numbers from the last successful poll are still there to display.
     assert poller.snapshot["wan"]["ip"] == good["wan"]["ip"]

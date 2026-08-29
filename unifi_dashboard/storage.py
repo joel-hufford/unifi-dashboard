@@ -22,12 +22,22 @@ CREATE TABLE IF NOT EXISTS samples (
     ping_recv  INTEGER NOT NULL DEFAULT 0,
     clients    INTEGER,
     wlan_score REAL,
-    wan_up     INTEGER NOT NULL DEFAULT 0
+    wan_up     INTEGER NOT NULL DEFAULT 0,
+    dns_ok     INTEGER,
+    dns_ms     REAL
 );
 CREATE INDEX IF NOT EXISTS samples_ts ON samples (ts);
 """
 
-COLUMNS = ("ts", "rx_bps", "tx_bps", "latency_ms", "ping_sent", "ping_recv", "clients", "wlan_score", "wan_up")
+COLUMNS = (
+    "ts", "rx_bps", "tx_bps", "latency_ms", "ping_sent", "ping_recv",
+    "clients", "wlan_score", "wan_up", "dns_ok", "dns_ms",
+)
+
+# Columns added after the first release. A dashboard that has been running for
+# a while has a database without them, and dropping that history to add a
+# column would be a poor trade.
+ADDED_COLUMNS = (("dns_ok", "INTEGER"), ("dns_ms", "REAL"))
 
 
 class History:
@@ -45,7 +55,14 @@ class History:
             self._db.execute("PRAGMA journal_mode=WAL")
         self._db.execute("PRAGMA synchronous=NORMAL")
         self._db.executescript(SCHEMA)
+        self._migrate()
         self._db.commit()
+
+    def _migrate(self) -> None:
+        present = {row["name"] for row in self._db.execute("PRAGMA table_info(samples)")}
+        for column, kind in ADDED_COLUMNS:
+            if column not in present:
+                self._db.execute(f"ALTER TABLE samples ADD COLUMN {column} {kind}")
 
     def close(self) -> None:
         with self._lock:
@@ -79,6 +96,8 @@ class History:
         row["ping_sent"] = int(row.get("ping_sent") or 0)
         row["ping_recv"] = int(row.get("ping_recv") or 0)
         row["wan_up"] = int(bool(row.get("wan_up")))
+        dns_ok = row.get("dns_ok")
+        row["dns_ok"] = None if dns_ok is None else int(bool(dns_ok))
         return row
 
     # -- reading ----------------------------------------------------------
@@ -113,6 +132,9 @@ class History:
                        SUM(ping_sent)      AS ping_sent,
                        SUM(ping_recv)      AS ping_recv,
                        SUM(wan_up)         AS wan_up_samples,
+                       SUM(dns_ok)         AS dns_ok_samples,
+                       COUNT(dns_ok)       AS dns_samples,
+                       AVG(dns_ms)         AS avg_dns_ms,
                        MIN(ts)             AS first_ts,
                        MAX(ts)             AS last_ts
                 FROM samples WHERE ts >= ?
@@ -130,5 +152,10 @@ class History:
         samples = summary.get("samples") or 0
         up = summary.get("wan_up_samples") or 0
         summary["uptime_pct"] = round(100.0 * up / samples, 2) if samples else None
+
+        dns_samples = summary.get("dns_samples") or 0
+        dns_ok = summary.get("dns_ok_samples") or 0
+        summary["dns_ok_pct"] = round(100.0 * dns_ok / dns_samples, 2) if dns_samples else None
+        summary["dns_failures"] = max(0, dns_samples - dns_ok)
         summary["window_minutes"] = minutes
         return summary

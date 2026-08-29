@@ -93,3 +93,69 @@ def test_band_label_thresholds():
     assert metrics.band_label(60) == "fair"
     assert metrics.band_label(10) == "poor"
     assert metrics.band_label(None) == "unknown"
+
+
+# --- multiple WAN links ----------------------------------------------------
+
+GATEWAY_DUAL_WAN = [
+    {
+        "type": "udm",
+        # Deliberately out of order, with a gap: a cellular backup commonly
+        # lands in wan3 with no wan2 at all.
+        "wan3": {"up": True, "ifname": "wwan0", "ip": "100.71.14.9",
+                 "isp_name": "Example Cellular", "uptime": 86400},
+        "wan1": {"up": True, "ifname": "eth8", "ip": "203.0.113.47",
+                 "isp_name": "Example Fiber", "rx_bytes-r": 5e6, "tx_bytes-r": 2e5},
+        "wan_networkgroup": "not a slot",
+        "wanX": {"up": True},
+    }
+]
+HEALTH_ON_PRIMARY = [{"subsystem": "wan", "status": "ok", "wan_ip": "203.0.113.47"}]
+HEALTH_ON_BACKUP = [{"subsystem": "wan", "status": "ok", "wan_ip": "100.71.14.9"}]
+
+
+def test_wan_links_are_discovered_sorted_and_filtered():
+    links = metrics.wan_links_from(HEALTH_ON_PRIMARY, GATEWAY_DUAL_WAN)
+    assert [link.key for link in links] == ["wan1", "wan3"]   # numeric order, gap kept
+    assert links[0].label == "WAN 1" and links[1].label == "WAN 3"
+
+
+def test_cellular_link_is_recognised_by_interface_name():
+    links = metrics.wan_links_from(HEALTH_ON_PRIMARY, GATEWAY_DUAL_WAN)
+    assert links[0].cellular is False
+    assert links[1].cellular is True
+
+
+def test_the_active_link_is_the_one_holding_the_wan_address():
+    on_primary = metrics.wan_links_from(HEALTH_ON_PRIMARY, GATEWAY_DUAL_WAN)
+    assert metrics.active_link(on_primary).key == "wan1"
+
+    on_backup = metrics.wan_links_from(HEALTH_ON_BACKUP, GATEWAY_DUAL_WAN)
+    assert metrics.active_link(on_backup).key == "wan3"
+    assert sum(link.active for link in on_backup) == 1
+
+
+def test_active_link_falls_back_to_the_first_link_that_is_up():
+    devices = [{"type": "udm",
+                "wan1": {"up": False, "ip": ""},
+                "wan3": {"up": True, "ifname": "wwan0", "ip": "100.71.14.9"}}]
+    links = metrics.wan_links_from([], devices)
+    assert metrics.active_link(links).key == "wan3"
+
+
+def test_wan_from_follows_a_failover_into_a_non_contiguous_slot():
+    # The regression this guards: a hardcoded wan1/wan2 lookup finds nothing
+    # when traffic moves to wan3, and throughput silently goes blank.
+    devices = [{"type": "udm",
+                "wan1": {"up": False, "ip": "", "rx_bytes-r": 0},
+                "wan3": {"up": True, "ifname": "wwan0", "ip": "100.71.14.9",
+                         "rx_bytes-r": 1.2e6, "tx_bytes-r": 4.5e4, "uptime": 86400}}]
+    wan = metrics.wan_from(HEALTH_ON_BACKUP, devices)
+    assert wan.ip == "100.71.14.9"
+    assert wan.rx_bps == 1.2e6
+    assert wan.tx_bps == 4.5e4
+
+
+def test_no_gateway_yields_no_links():
+    assert metrics.wan_links_from([], []) == []
+    assert metrics.active_link([]) is None

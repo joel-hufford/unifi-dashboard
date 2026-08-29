@@ -11,6 +11,7 @@ from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
 from .config import Config
+from .metrics import _WAN_KEY, find_gateway
 from .poller import Poller
 from .storage import History
 from .unifi_client import UniFiClient
@@ -47,11 +48,35 @@ def create_app(cfg: Config) -> FastAPI:
             "window_minutes": cfg.history.window_minutes,
             "retention_minutes": cfg.history.retention_minutes,
             "ping_target": cfg.ping.target,
+            "dns_host": cfg.dns.probe_host,
+            "theme": cfg.ui.theme,
             "demo": cfg.demo,
         }
         # 200 even when the controller is down: the page wants the last good
         # snapshot plus the error, not an exception.
         return JSONResponse(payload)
+
+    @app.get("/api/debug/wan")
+    async def debug_wan():
+        """The gateway's WAN interfaces and the WAN health subsystems, exactly
+        as the controller returned them. This is the payload to send when WAN
+        detection gets something wrong: it holds no client names or MACs, only
+        the uplink detail."""
+        raw = poller.last_raw
+        gateway = find_gateway(raw.get("devices") or [])
+        interfaces = {}
+        if isinstance(gateway, dict):
+            interfaces = {key: value for key, value in gateway.items() if _WAN_KEY.match(key)}
+        return {
+            "gateway_type": (gateway or {}).get("type"),
+            "gateway_model": (gateway or {}).get("model"),
+            "wan_interfaces": interfaces,
+            "health": [
+                entry for entry in (raw.get("health") or [])
+                if entry.get("subsystem") in ("wan", "www")
+            ],
+            "parsed": poller.snapshot.get("wan_links", []),
+        }
 
     @app.get("/api/healthz")
     async def healthz():

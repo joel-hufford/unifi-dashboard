@@ -11,6 +11,7 @@ import math
 import random
 import time
 
+from .dnsprobe import DnsResult
 from .ping import PingResult
 
 _MACS = ["ac:1f:6b", "78:8a:20", "b4:fb:e4", "f0:9f:c2", "24:5a:4c"]
@@ -26,12 +27,17 @@ _BANDS = ["ng", "na", "na", "6e"]
 class DemoSource:
     """Random-walk generator that looks like a busy small network."""
 
-    def __init__(self, seed: int | None = None) -> None:
+    #: Fault injections, so the alarm states can be seen without breaking a
+    #: real network to do it. Selected with --demo-fault.
+    FAULTS = ("none", "wan-down", "dns", "loss", "latency", "failover")
+
+    def __init__(self, seed: int | None = None, fault: str = "none") -> None:
         self.rng = random.Random(seed)
         self.start = time.time()
         self.rx_level = 3e6
         self.tx_level = 4e5
         self.client_count = 42
+        self.fault = fault if fault in self.FAULTS else "none"
 
     # -- shaping ----------------------------------------------------------
 
@@ -49,7 +55,16 @@ class DemoSource:
             self.tx_level * self.rng.uniform(0.85, 1.15),
         )
 
+    def dns(self, host: str = "cloudflare.com") -> DnsResult:
+        if self.fault in ("dns", "wan-down"):
+            return DnsResult(host=host, ok=False, error="Temporary failure in name resolution")
+        return DnsResult(
+            host=host, ok=True, elapsed_ms=round(self.rng.uniform(18, 46), 1), address="104.16.132.229"
+        )
+
     def ping(self, count: int = 3) -> PingResult:
+        if self.fault == "wan-down":
+            return PingResult(sent=count, received=0)
         base = 13.5 + 3.0 * math.sin(time.time() / 190.0)
         spike = self.rng.random() < 0.05
         latency = base + self.rng.uniform(-1.5, 2.5) + (self.rng.uniform(20, 90) if spike else 0.0)
@@ -58,6 +73,10 @@ class DemoSource:
             received = count - 1
         if self.rng.random() < 0.005:
             received = 0
+        if self.fault == "loss" and self.rng.random() < 0.45:
+            received = max(0, count - 2)
+        if self.fault == "latency":
+            latency += 380
         result = PingResult(sent=count, received=received)
         if received:
             result.avg_ms = round(latency, 1)
@@ -72,11 +91,17 @@ class DemoSource:
         self.client_count = max(28, min(56, self.client_count + self.rng.choice([-1, 0, 0, 0, 1])))
         uptime = int(time.time() - self.start) + 1_083_600
 
+        failed_over = self.fault == "failover"
+        wan_down = self.fault == "wan-down"
+        primary_ip = "203.0.113.47"
+        backup_ip = "100.71.14.9"
+        active_ip = backup_ip if failed_over else primary_ip
+
         health = [
             {
                 "subsystem": "wan",
-                "status": "ok",
-                "wan_ip": "203.0.113.47",
+                "status": "error" if wan_down else "ok",
+                "wan_ip": "" if wan_down else active_ip,
                 "gw_name": "Dream Machine Pro",
                 "num_adopted": 7,
                 "num_disconnected": 0,
@@ -104,13 +129,28 @@ class DemoSource:
                 "state": 1,
                 "upgradable": False,
                 "wan1": {
-                    "up": True,
-                    "ip": "203.0.113.47",
-                    "rx_bytes-r": rx,
-                    "tx_bytes-r": tx,
+                    "up": not (failed_over or wan_down),
+                    "ifname": "eth8",
+                    "wan_networkgroup": "WAN",
+                    "ip": "" if (failed_over or wan_down) else primary_ip,
+                    "rx_bytes-r": 0 if (failed_over or wan_down) else rx,
+                    "tx_bytes-r": 0 if (failed_over or wan_down) else tx,
                     "rx_bytes": int(rx * 8000),
                     "tx_bytes": int(tx * 8000),
+                    "uptime": uptime,
                     "isp_name": "Example Fiber",
+                },
+                "wan3": {
+                    "up": True,
+                    "ifname": "wwan0",
+                    "wan_networkgroup": "WAN3",
+                    "ip": backup_ip if failed_over else "",
+                    "rx_bytes-r": rx * 0.2 if failed_over else 0,
+                    "tx_bytes-r": tx * 0.2 if failed_over else 0,
+                    "rx_bytes": int(rx * 400),
+                    "tx_bytes": int(tx * 400),
+                    "uptime": 86_400,
+                    "isp_name": "Example Cellular",
                 },
             },
             {"type": "usw", "name": "Office switch", "state": 1, "upgradable": True},
@@ -161,6 +201,7 @@ def seed_history(store, source: "DemoSource", *, minutes: int, interval: float) 
         ts = now - step * interval
         rx, tx = source._throughput(ts - source.start)
         probe = source.ping()
+        probe_dns = source.dns()
         batch.append(
             {
                 "ts": ts,
@@ -172,6 +213,8 @@ def seed_history(store, source: "DemoSource", *, minutes: int, interval: float) 
                 "clients": source.client_count,
                 "wlan_score": round(78 + 8 * math.sin(ts / 600.0), 1),
                 "wan_up": True,
+                "dns_ok": probe_dns.ok,
+                "dns_ms": probe_dns.elapsed_ms,
             }
         )
     store.record_many(batch)

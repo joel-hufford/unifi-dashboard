@@ -47,6 +47,29 @@ count = 3          # packets per poll; more packets = finer packet-loss resoluti
 interval = 0.25    # seconds between packets (>= 0.2 without root)
 timeout = 1.0      # seconds to wait for each reply
 
+[dns]
+# Resolved every poll, through the system resolver, to prove name resolution
+# works and not merely that packets route. A working ICMP path with dead DNS
+# is the most common "the internet is broken" state on a small network.
+probe_host = "cloudflare.com"
+timeout = 2.0
+
+[alarm]
+# What turns the screen's border amber, and what turns it red.
+loss_pct_warning = 2.0
+loss_pct_critical = 10.0
+latency_ms_warning = 150.0
+latency_ms_critical = 400.0
+# Running on the backup WAN is not an outage, but on a metered cellular link
+# it is something you want to notice the same day. Amber by default.
+failover_is_critical = false
+
+[ui]
+# The theme the panel starts in: "dark" or "light". The on-screen toggle only
+# changes the current session, so a stray touch corrects itself on the next
+# refresh instead of leaving a wall panel in the wrong theme.
+theme = "dark"
+
 [server]
 host = "127.0.0.1"  # 0.0.0.0 to reach the dashboard from other machines
 port = 8787
