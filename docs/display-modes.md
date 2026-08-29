@@ -92,9 +92,50 @@ sudo apt install -y edid-decode
 edid-decode < /sys/class/drm/card1-HDMI-A-1/edid
 ```
 
-The reliable fix from here is a hand-written EDID binary placed in
-`/lib/firmware/edid/` and loaded with
-`drm.edid_firmware=HDMI-A-1:edid/yourpanel.bin` on the cmdline.
+The fix from here is to supply an EDID yourself. This is also the tidier
+long-term answer even when `video=` works, because the panel ends up
+self-describing: the mode survives `cmdline.txt` being rewritten by an OS
+update, and it is the preferred mode rather than one forced over the top.
+
+### Using the bundled 1280x400 EDID
+
+`deploy/edid/pi_1280x400.bin` is a 256-byte EDID 1.3 blob for a 1280x400 bar
+display:
+
+| | |
+|---|---|
+| preferred timing | 1280x400 @ 60.003307 Hz |
+| pixel clock | 36.290 MHz (htotal 1440, vtotal 420) |
+| monitor name | `1280x400 CVT` |
+
+```bash
+sudo mkdir -p /lib/firmware/edid
+sudo cp deploy/edid/pi_1280x400.bin /lib/firmware/edid/
+```
+
+Then in `/boot/firmware/cmdline.txt` - still one line - **replace** any
+`video=` parameter for this connector with:
+
+```
+drm.edid_firmware=HDMI-A-1:edid/pi_1280x400.bin
+```
+
+Replace rather than add. A forced `video=` mode and an EDID-declared mode for
+the same resolution produce slightly different timings (a CVT-derived
+`59.999001` against this blob's `60.003307`), and keeping both leaves two
+near-identical modes in the list and no easy way to tell which is live.
+
+Reboot and confirm with `wlr-randr`. If the connector comes up with its
+original modes and no error, the EDID was requested before the root
+filesystem was available - the DRM driver can probe that early - and the blob
+needs to go into the initramfs.
+
+### Rolling your own
+
+`edid-generator` (the `edid.S` / `modeline` toolchain) builds these from a
+modeline. Sanity-check any blob before trusting it: both 128-byte blocks must
+checksum to zero mod 256, and the first detailed timing descriptor at byte 54
+is the preferred mode.
 
 ## The dashboard does not care
 
