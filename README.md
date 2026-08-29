@@ -134,7 +134,35 @@ sudo systemctl restart unifi-dashboard
 journalctl -u unifi-dashboard -f
 ```
 
-### Controller access
+### Updating
+
+The service runs from `/opt/unifi-dashboard`, and its unit sets `ProtectHome`,
+so it cannot read your clone in `/home` at all. **A `git pull` on its own
+changes nothing the service sees** - the code has to be synced across.
+
+```bash
+~/unifi-dashboard/deploy/update.sh
+```
+
+That pulls, shows what changed, syncs to `/opt`, refreshes the virtualenv only
+if `requirements.txt` moved, restarts the service and checks it came back. It
+re-execs itself under `sudo`, and pulls as the clone's owner so it does not
+leave root-owned objects behind.
+
+Worth an alias:
+
+```bash
+echo "alias dash-update='~/unifi-dashboard/deploy/update.sh'" >> ~/.bashrc
+echo "alias dash-log='journalctl -u unifi-dashboard -f'"      >> ~/.bashrc
+echo "alias dash-restart='sudo systemctl restart unifi-dashboard'" >> ~/.bashrc
+source ~/.bashrc
+```
+
+Re-running `deploy/install.sh` also works and is idempotent, but it does a full
+`apt-get update` each time. Use it after changing the systemd unit or when the
+required packages change; `update.sh` otherwise.
+
+## Controller access
 
 Two ways in, in order of preference:
 
