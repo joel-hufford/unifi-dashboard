@@ -19,9 +19,9 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--demo", action="store_true", help="serve synthetic data, no controller needed")
     parser.add_argument(
         "--demo-fault",
-        choices=("none", "wan-down", "dns", "loss", "latency", "failover"),
+        choices=("none", "quiet", "wan-down", "dns", "loss", "latency", "failover"),
         default="none",
-        help="with --demo, inject a fault so the alarm states can be seen",
+        help="with --demo, inject a fault or traffic profile for testing",
     )
     parser.add_argument("-v", "--verbose", action="store_true", help="debug logging")
     args = parser.parse_args(argv)

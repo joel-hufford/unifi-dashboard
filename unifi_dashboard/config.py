@@ -46,6 +46,18 @@ class PingConfig:
 
 
 @dataclass
+class ChartConfig:
+    # Home and small-office WAN traffic is idle most of the time with rare
+    # bursts, so a linear axis scaled to the peak leaves the line flat on the
+    # baseline. "log" makes ordinary traffic visible; "linear" is truer to
+    # magnitude and fine on a consistently busy link.
+    throughput_scale: str = "log"
+    # How many decades the log axis spans below its top. Three covers roughly
+    # 0.5 Mbps to 500 Mbps.
+    log_decades: float = 3.0
+
+
+@dataclass
 class UiConfig:
     # The theme the panel starts in. The on-screen toggle only changes the
     # current session, so a stray touch on a wall panel corrects itself on the
@@ -103,6 +115,7 @@ class Config:
     ping: PingConfig = field(default_factory=PingConfig)
     dns: DnsConfig = field(default_factory=DnsConfig)
     ui: UiConfig = field(default_factory=UiConfig)
+    charts: ChartConfig = field(default_factory=ChartConfig)
     alarm: AlarmConfig = field(default_factory=AlarmConfig)
     server: ServerConfig = field(default_factory=ServerConfig)
     history: HistoryConfig = field(default_factory=HistoryConfig)
@@ -162,6 +175,7 @@ _NESTED = {
     "ping": PingConfig,
     "dns": DnsConfig,
     "ui": UiConfig,
+    "charts": ChartConfig,
     "alarm": AlarmConfig,
     "server": ServerConfig,
     "history": HistoryConfig,

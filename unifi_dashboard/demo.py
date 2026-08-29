@@ -29,7 +29,7 @@ class DemoSource:
 
     #: Fault injections, so the alarm states can be seen without breaking a
     #: real network to do it. Selected with --demo-fault.
-    FAULTS = ("none", "wan-down", "dns", "loss", "latency", "failover")
+    FAULTS = ("none", "quiet", "wan-down", "dns", "loss", "latency", "failover")
 
     def __init__(self, seed: int | None = None, fault: str = "none") -> None:
         self.rng = random.Random(seed)
@@ -43,6 +43,8 @@ class DemoSource:
 
     def _throughput(self, t: float) -> tuple[float, float]:
         """Bytes/second down and up, with occasional streaming-sized bursts."""
+        if self.fault == "quiet":
+            return self._quiet_throughput()
         wave = 0.5 + 0.5 * math.sin(t / 420.0)
         self.rx_level = max(2.0e5, self.rx_level * 0.82 + wave * 6.0e6 * 0.18)
         self.tx_level = max(3.0e4, self.tx_level * 0.85 + wave * 6.0e5 * 0.15)
@@ -54,6 +56,17 @@ class DemoSource:
             self.rx_level * self.rng.uniform(0.85, 1.15),
             self.tx_level * self.rng.uniform(0.85, 1.15),
         )
+
+    def _quiet_throughput(self) -> tuple[float, float]:
+        """A mostly idle link: tens of kbps of background chatter, with a rare
+        burst. This is what a small site actually looks like, and it is the
+        case a peak-scaled linear axis renders as a flat line."""
+        rx = self.rng.uniform(2_000, 40_000)
+        tx = self.rng.uniform(1_500, 25_000)
+        if self.rng.random() < 0.02:
+            rx += self.rng.uniform(2.0e6, 1.0e7)
+            tx += self.rng.uniform(1.0e5, 4.0e5)
+        return rx, tx
 
     def dns(self, host: str = "cloudflare.com") -> DnsResult:
         if self.fault in ("dns", "wan-down"):

@@ -50,6 +50,8 @@ def create_app(cfg: Config) -> FastAPI:
             "ping_target": cfg.ping.target,
             "dns_host": cfg.dns.probe_host,
             "theme": cfg.ui.theme,
+            "throughput_scale": cfg.charts.throughput_scale,
+            "log_decades": cfg.charts.log_decades,
             "demo": cfg.demo,
         }
         # 200 even when the controller is down: the page wants the last good

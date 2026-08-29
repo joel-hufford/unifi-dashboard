@@ -12,6 +12,10 @@ secrets.env
 *.env
 .env
 
+# Controller dumps: these carry real MACs, public addresses and site names.
+# Paste them into a conversation rather than committing them.
+diagnostics/*.json
+
 *.db
 *.db-wal
 *.db-shm
