@@ -6,6 +6,11 @@ internet; a single-page kiosk UI shows what the network is doing right now.
 
 ![The dashboard on a 1280x720 panel](docs/screenshot.png)
 
+On a 1280x400 bar display the layout rearranges into three columns rather than
+shrinking:
+
+![The dashboard on a 1280x400 bar display](docs/screenshot-bar.png)
+
 ## What it shows
 
 | Metric | Where it comes from |
@@ -27,6 +32,20 @@ The graph window is switchable (15m / 1h / 3h) and scopes every number on the
 page, so the averages always agree with the plots. Tapping a chart shows a
 crosshair with all three series at that moment, and the `Table` button swaps
 the plots for the same data in five-minute buckets.
+
+## Display layouts
+
+The page has three layouts, chosen by viewport rather than by configuration:
+
+| Viewport | Layout |
+|---|---|
+| Landscape, taller than 460px | Top bar, a row of four stat tiles, then charts beside the Wi-Fi card. |
+| **Landscape, 460px or shorter** (bar displays like 1280x400) | Three columns: latency and packet loss at the left, charts in the middle, devices and Wi-Fi quality at the right. The Wi-Fi detail card is dropped and its device-health line folds into the devices tile. |
+| Portrait (the Touch Display 2's native orientation) | One column: tiles two-up, then charts, then the Wi-Fi card. |
+
+Verified at 1280x400, 1024x600, 1280x720 and 720x1280, in both palettes. On a
+short landscape panel (around 1024x600) the Wi-Fi card drops its per-band
+breakdown and shows three weak clients instead of five, rather than clipping.
 
 ## Hardware
 

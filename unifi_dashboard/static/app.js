@@ -151,8 +151,9 @@
 
     $("kpi-ping-target").textContent = wan.ping_target || "8.8.8.8";
     $("kpi-latency").textContent = ms(wan.latency_ms);
+    // Non-breaking space so a narrow tile never wraps "ms" onto its own line.
     $("kpi-latency-sub").textContent =
-      `avg ${ms(win.avg_latency_ms)} · min ${ms(win.min_latency_ms)} · max ${ms(win.max_latency_ms)} ms`;
+      `avg ${ms(win.avg_latency_ms)} · min ${ms(win.min_latency_ms)} · max ${ms(win.max_latency_ms)}\u00a0ms`;
 
     const loss = win.loss_pct;
     $("kpi-loss").textContent = loss == null ? "—" : loss.toFixed(loss >= 10 ? 0 : 1);
@@ -620,10 +621,14 @@
       bandList.appendChild(item);
     }
 
-    $("gear").textContent =
+    const gear =
       `${num(devices.online)} of ${num(devices.total)} UniFi devices online` +
       (devices.offline ? ` · ${devices.offline} offline` : "") +
       (devices.upgradable ? ` · ${devices.upgradable} update available` : "");
+    $("gear").textContent = gear;
+    // Shown only on bar displays, where the Wi-Fi card (and its footer) is
+    // dropped for want of vertical room.
+    $("kpi-gear").textContent = gear;
   }
 
   /* ----------------------------------------------------------------- table */
