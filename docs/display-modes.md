@@ -54,12 +54,29 @@ configuration and re-applies its profile on every hotplug. Put the mode in
 
 ```
 profile {
-	output HDMI-A-1 enable mode 1280x400@60Hz position 0,0 scale 1
+	output HDMI-A-1 enable mode 1280x400 position 0,0 scale 1
 }
 ```
 
-Then `kanshictl reload`, or reboot. Note that Pi OS's Screen Configuration
-tool writes this same file, so it can overwrite hand edits.
+**Leave the refresh rate off.** Panels rarely run at a round number - a
+1280x400 bar display typically reports `59.999001` - and kanshi matches the
+rate exactly. Write `@60Hz` and the profile silently fails to apply, dropping
+you back to whatever you were trying to escape, with symptoms identical to
+having changed nothing. Without a rate it matches on resolution and takes the
+preferred timing.
+
+Edit the *existing* profile block rather than appending a new one: kanshi uses
+the first profile whose outputs match the connected set, so a block appended
+after one that identifies the output by description (a quoted
+`"Vendor Model Serial"`) is never reached. Newer kanshi also reads
+`~/.config/kanshi/config.d/`, which outranks a hand-edited `config`.
+
+Then `kanshictl reload`, or reboot. Pi OS's Screen Configuration tool writes
+this same file, so it can overwrite hand edits - and a profile it saved
+earlier, when the panel offered fewer modes, is a common reason a newly
+available mode never gets used. If the mode you want is now the *preferred*
+one, deleting the override entirely is the tidiest fix: with no profile, the
+compositor picks the preferred mode by itself.
 
 For a one-off interactive test - useful for checking a mode before committing
 to it - `wlr-randr --output HDMI-A-1 --mode 1280x400@60`. Some builds also
