@@ -159,3 +159,44 @@ def test_wan_from_follows_a_failover_into_a_non_contiguous_slot():
 def test_no_gateway_yields_no_links():
     assert metrics.wan_links_from([], []) == []
     assert metrics.active_link([]) is None
+
+
+# --- against a real UCG-Max payload ----------------------------------------
+# Captured from a live gateway with a UniFi cellular backup, with addresses and
+# MACs scrubbed. Every assertion here corresponds to something the synthetic
+# fixtures got wrong.
+
+def test_real_ucg_max_dual_wan(ucg_max):
+    links = metrics.wan_links_from(ucg_max["health"], [ucg_max["gateway"]])
+    assert [link.key for link in links] == ["wan1", "wan3"]
+
+    primary, backup = links
+
+    # Labels: `name` is the interface name on this firmware ("eth4", "gre1"),
+    # so it must not be used as a label.
+    assert (primary.label, backup.label) == ("WAN 1", "WAN 3")
+
+    # A 2.5GbE ethernet WAN reports media "2.5GE". Substring-matching "5g"
+    # against that flagged the primary as cellular.
+    assert primary.cellular is False
+    assert primary.up is True and primary.active is True
+
+    # The real cellular signal is the mbb block, not the interface name: this
+    # gateway tunnels its cellular backup over gre1.
+    assert backup.cellular is True
+    assert backup.rat == "5G"
+    assert backup.signal_pct == 100
+    assert backup.active is False and backup.up is True   # connected but idle
+
+    # ISP and uptime are only in the health subsystems, never on the interface.
+    assert primary.isp == "Example Broadband"
+    assert primary.uptime_s == 1426
+    assert backup.isp is None
+
+
+def test_real_payload_flattens_to_the_active_link(ucg_max):
+    wan = metrics.wan_from(ucg_max["health"], [ucg_max["gateway"]])
+    assert wan.online is True
+    assert wan.ip == "192.0.2.20"
+    assert wan.isp == "Example Broadband"
+    assert wan.rx_bps == 2777 and wan.tx_bps == 28390

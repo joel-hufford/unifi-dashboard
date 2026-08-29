@@ -29,3 +29,8 @@ def clients():
 @pytest.fixture
 def devices_counters_only():
     return load("devices_counters_only.json")
+
+
+@pytest.fixture
+def ucg_max():
+    return load("ucg_max_dual_wan.json")

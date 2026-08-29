@@ -208,7 +208,11 @@
     const viewingActive = !link || link.active;
 
     $("hero-label").textContent = link ? (link.label || link.key.toUpperCase()) : "WAN";
-    $("hero-badge").hidden = !(link && link.cellular);
+    const badge = $("hero-badge");
+    badge.hidden = !(link && link.cellular);
+    // The radio technology is more informative than the word "cellular", and
+    // the gateway reports it.
+    badge.textContent = (link && link.rat) || "Cellular";
 
     const lamp = $("hero-lamp");
     lamp.dataset.state = LINK_STATE(link);
@@ -231,7 +235,7 @@
       $("check-dns-value").textContent = "—";
       $("check-loss-value").textContent = "—";
       $("hero-foot").textContent =
-        `Standby link · uptime ${duration(link && link.uptime_s)} · checks below run over the active WAN`;
+        [standbyDetail(link), "checks below run over the active WAN"].filter(Boolean).join(" · ");
       return;
     }
 
@@ -249,8 +253,16 @@
 
     const parts = [`uptime ${duration(link ? link.uptime_s : wan.uptime_s)}`];
     if (link && link.isp) parts.push(link.isp);
+    if (link && link.signal_pct != null) parts.push(`${link.rat || "signal"} ${Math.round(link.signal_pct)}%`);
     parts.push(`${wan.ping_target || "8.8.8.8"} · ${dns.host || "dns"}`);
     $("hero-foot").textContent = parts.join(" · ");
+  }
+
+  function standbyDetail(link) {
+    const bits = ["Standby link"];
+    if (link && link.signal_pct != null) bits.push(`${link.rat || "signal"} ${Math.round(link.signal_pct)}%`);
+    if (link && link.ip) bits.push(link.ip);
+    return bits.join(" · ");
   }
 
   function renderKpis(data) {

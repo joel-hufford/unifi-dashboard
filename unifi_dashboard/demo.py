@@ -128,10 +128,14 @@ class DemoSource:
                 "model": "UDMPRO",
                 "state": 1,
                 "upgradable": False,
+                # Shaped like a real UCG-Max: no wan_networkgroup, `name` is
+                # the interface name, and the cellular link is an mbb tunnel.
                 "wan1": {
                     "up": not (failed_over or wan_down),
-                    "ifname": "eth8",
-                    "wan_networkgroup": "WAN",
+                    "ifname": "eth4",
+                    "name": "eth4",
+                    "type": "ethernet",
+                    "media": "2.5GE",
                     "ip": "" if (failed_over or wan_down) else primary_ip,
                     "rx_bytes-r": 0 if (failed_over or wan_down) else rx,
                     "tx_bytes-r": 0 if (failed_over or wan_down) else tx,
@@ -142,8 +146,11 @@ class DemoSource:
                 },
                 "wan3": {
                     "up": True,
-                    "ifname": "wwan0",
-                    "wan_networkgroup": "WAN3",
+                    "ifname": "gre1",
+                    "name": "gre1",
+                    "type": "wireless_5g",
+                    "mbb_state": "ready",
+                    "mbb": {"rat": "5G", "signal_pct": 78, "lte_rsrp": -92, "nr_rsrp": -83},
                     "ip": backup_ip if failed_over else "",
                     "rx_bytes-r": rx * 0.2 if failed_over else 0,
                     "tx_bytes-r": tx * 0.2 if failed_over else 0,

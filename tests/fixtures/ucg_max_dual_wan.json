@@ -1,0 +1,231 @@
+{
+  "gateway": {
+    "model": "UCGMAX",
+    "type": "udm",
+    "wan1": {
+      "autoneg": true,
+      "availability": 100,
+      "bytes-r": 31167,
+      "enable": true,
+      "flowctrl_rx": false,
+      "flowctrl_tx": false,
+      "full_duplex": true,
+      "ifname": "eth4",
+      "ip": "192.0.2.20",
+      "ipv6": [
+        "fe80::2a70:4eff:fe84:d1df"
+      ],
+      "is_uplink": true,
+      "latency": 2,
+      "mac": "aa:bb:cc:00:11:22",
+      "mac_table": [
+        {
+          "age": 39383,
+          "authorized": false,
+          "hostname": "?",
+          "ip": "192.0.2.1",
+          "lastReachable": 15,
+          "mac": "aa:bb:cc:00:11:22"
+        }
+      ],
+      "max_speed": 2500,
+      "media": "2.5GE",
+      "name": "eth4",
+      "netmask": "255.255.255.0",
+      "num_port": 1,
+      "poe_class": "Class 0",
+      "poe_enable": false,
+      "poe_power": "0.00",
+      "port_idx": 5,
+      "port_poe": false,
+      "rx_broadcast": 0,
+      "rx_bytes": 5366792844,
+      "rx_bytes-r": 2777,
+      "rx_dropped": 3,
+      "rx_errors": 0,
+      "rx_multicast": 0,
+      "rx_packets": 4460826,
+      "rx_rate": 22223,
+      "rx_rate-max": 267450,
+      "speed": 1000,
+      "speed_caps": 1048687,
+      "tx_broadcast": 0,
+      "tx_bytes": 688486762,
+      "tx_bytes-r": 28390,
+      "tx_dropped": 0,
+      "tx_errors": 0,
+      "tx_multicast": 0,
+      "tx_packets": 1902269,
+      "tx_rate": 227123,
+      "tx_rate-max": 429341,
+      "type": "ethernet",
+      "up": true,
+      "uplink_ifname": "eth4"
+    },
+    "wan3": {
+      "bytes-r": 0,
+      "ifname": "gre1",
+      "ip": "198.51.100.7",
+      "ipv6": [],
+      "mbb": {
+        "cell_id": 20600577,
+        "ipv4_mtu": 1436,
+        "ipv6_mtu": 1500,
+        "lte_ca": [
+          {
+            "band": 66,
+            "dl_bandwidth_mhz": 20.0,
+            "dl_channel_number": 66786,
+            "primary": true
+          }
+        ],
+        "lte_rsrp": -92,
+        "lte_rsrq": -11,
+        "lte_sinr": 17.200000762939453,
+        "nr_ca": [
+          {
+            "band": 71,
+            "dl_bandwidth_mhz": 15.0,
+            "dl_channel_number": 126900,
+            "primary": true
+          },
+          {
+            "band": 41,
+            "dl_bandwidth_mhz": 100.0,
+            "dl_channel_number": 528000,
+            "primary": false
+          }
+        ],
+        "nr_rsrp": -83,
+        "nr_rsrq": -12,
+        "nr_sa_mode": false,
+        "nr_sinr": 10,
+        "rat": "5G",
+        "signal_pct": 100
+      },
+      "mbb_device_mac": "aa:bb:cc:00:11:22",
+      "mbb_state": "ready",
+      "multicast": "0",
+      "name": "gre1",
+      "netmask": "255.255.255.224",
+      "rx_bytes": 0,
+      "rx_bytes-r": 0,
+      "rx_dropped": 0,
+      "rx_errors": 0,
+      "rx_multicast": 0,
+      "rx_packets": 0,
+      "tx_bytes": 947919,
+      "tx_bytes-r": 0,
+      "tx_dropped": 0,
+      "tx_errors": 0,
+      "tx_packets": 13602,
+      "tx_rate": 0,
+      "type": "wireless_5g",
+      "up": true,
+      "uplink_ifname": "gre1"
+    }
+  },
+  "health": [
+    {
+      "asn": 22773,
+      "gateways": [
+        "192.0.2.1"
+      ],
+      "gw_mac": "aa:bb:cc:00:11:22",
+      "gw_name": "Example-UCG-Max",
+      "gw_system-stats": {
+        "cpu": "15.9",
+        "mem": "60.6",
+        "uptime": "39464"
+      },
+      "gw_version": "5.1.31.34074",
+      "isp_name": "Example Broadband",
+      "isp_organization": "Cox Communications Inc.",
+      "nameservers": [],
+      "netmask": "255.255.255.0",
+      "num_adopted": 1,
+      "num_disconnected": 0,
+      "num_gw": 1,
+      "num_pending": 0,
+      "num_sta": 2,
+      "rx_bytes-r": 2777,
+      "status": "ok",
+      "subsystem": "wan",
+      "tx_bytes-r": 28390,
+      "uptime_stats": {
+        "WAN": {
+          "alerting_monitors": [
+            {
+              "availability": 100.0,
+              "latency_average": 2,
+              "target": "ping.ui.com",
+              "type": "icmp"
+            },
+            {
+              "availability": 100.0,
+              "latency_average": 2,
+              "target": "1.1.1.1",
+              "type": "dns"
+            },
+            {
+              "availability": 100.0,
+              "latency_average": 16,
+              "target": "8.8.8.8",
+              "type": "dns"
+            }
+          ],
+          "availability": 100.0,
+          "latency_average": 2,
+          "monitors": [
+            {
+              "availability": 100.0,
+              "latency_average": 13,
+              "target": "www.microsoft.com",
+              "type": "icmp"
+            },
+            {
+              "availability": 100.0,
+              "latency_average": 12,
+              "target": "google.com",
+              "type": "icmp"
+            },
+            {
+              "availability": 100.0,
+              "latency_average": 2,
+              "target": "1.1.1.1",
+              "type": "icmp"
+            }
+          ],
+          "time_period": 1416,
+          "uptime": 1412
+        },
+        "WAN3": {
+          "alerting_monitors": [
+            {
+              "availability": 0.0,
+              "target": "ping.ui.com",
+              "type": "icmp"
+            }
+          ],
+          "downtime": 39381
+        }
+      },
+      "wan_ip": "192.0.2.20"
+    },
+    {
+      "drops": 2,
+      "gw_mac": "aa:bb:cc:00:11:22",
+      "latency": 14,
+      "rx_bytes-r": 2777,
+      "speedtest_lastrun": 1788035501,
+      "speedtest_ping": 4,
+      "speedtest_status": "Success",
+      "status": "ok",
+      "subsystem": "www",
+      "tx_bytes-r": 28390,
+      "uptime": 1426,
+      "xput_down": 302.0,
+      "xput_up": 301.0
+    }
+  ]
+}

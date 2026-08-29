@@ -114,6 +114,8 @@ class WanLink:
     up: bool = False
     active: bool = False                  # the link currently carrying traffic
     cellular: bool = False
+    rat: str | None = None                # "5G", "LTE" - cellular links only
+    signal_pct: float | None = None
     ip: str | None = None
     isp: str | None = None
     uptime_s: float | None = None
@@ -169,19 +171,39 @@ class WlanQuality:
 # wan3 with no wan2 at all.
 _WAN_KEY = re.compile(r"^wan(\d+)$")
 
-# A cellular uplink shows up under different names across firmware versions,
-# so match on several: the interface name is the most reliable signal.
-_CELLULAR_HINTS = ("wwan", "ppp", "lte", "cellular", "5g", "modem")
+# Mobile-broadband keys. Their presence is definitive: a UniFi cellular backup
+# reports an "mbb" block whatever interface it happens to be tunnelled over
+# (a UCG-Max presents its cellular uplink as gre1, not wwan0).
+_MBB_KEYS = ("mbb", "mbb_state", "mbb_device_mac")
+
+# Interface *types* that mean cellular. Matched as whole words against `type`
+# only - never as substrings across arbitrary fields, because "2.5GE" media on
+# an ordinary ethernet WAN contains "5g".
+_CELLULAR_TYPES = {"wireless_5g", "wireless_lte", "wireless_4g", "cellular", "lte", "wwan", "modem"}
+_CELLULAR_IFNAME_PREFIXES = ("wwan", "ppp", "mbim", "qmi", "cdc-wdm")
 
 
 def is_cellular(iface: dict | None) -> bool:
     if not isinstance(iface, dict):
         return False
-    for key in ("ifname", "type", "media", "wan_type", "comment", "name"):
-        value = iface.get(key)
-        if isinstance(value, str) and any(hint in value.lower() for hint in _CELLULAR_HINTS):
-            return True
+    if any(key in iface for key in _MBB_KEYS):
+        return True
+    kind = iface.get("type")
+    if isinstance(kind, str) and kind.strip().lower() in _CELLULAR_TYPES:
+        return True
+    ifname = iface.get("ifname")
+    if isinstance(ifname, str) and ifname.lower().startswith(_CELLULAR_IFNAME_PREFIXES):
+        return True
     return False
+
+
+def cellular_signal(iface: dict | None) -> tuple[str | None, float | None]:
+    """Radio technology and signal percentage from an mbb block, if present."""
+    mbb = (iface or {}).get("mbb")
+    if not isinstance(mbb, dict):
+        return None, None
+    rat = mbb.get("rat")
+    return (rat if isinstance(rat, str) else None), _num(mbb.get("signal_pct"))
 
 
 def wan_links_from(health: list[dict], devices: list[dict]) -> list[WanLink]:
@@ -205,12 +227,18 @@ def wan_links_from(health: list[dict], devices: list[dict]) -> list[WanLink]:
     links: list[WanLink] = []
     for number, key in slots:
         iface = gateway[key]
+        rat, signal_pct = cellular_signal(iface)
         links.append(
             WanLink(
                 key=key,
-                label=_first_str(iface, "wan_networkgroup", "name") or f"WAN {number}",
+                # Only a network *group* name is a label. `name` is the
+                # interface name on real firmware ("eth4", "gre1"), which is
+                # not what anyone wants to read on a wall panel.
+                label=_first_str(iface, "wan_networkgroup") or f"WAN {number}",
                 up=bool(iface.get("up")),
                 cellular=is_cellular(iface),
+                rat=rat,
+                signal_pct=signal_pct,
                 ip=_first_str(iface, "ip"),
                 isp=_first_str(iface, "isp_name", "isp_organization"),
                 uptime_s=_first_num(iface, "uptime"),
@@ -231,6 +259,20 @@ def wan_links_from(health: list[dict], devices: list[dict]) -> list[WanLink]:
     if chosen is None:
         chosen = next((l for l in links if l.up), links[0])
     chosen.active = True
+
+    # The health subsystems describe the active uplink only, and carry detail
+    # the interface object does not: the ISP name lives there, and per-link
+    # uptime is not reported at all.
+    www = subsystems.get("www", {})
+    if chosen.isp is None:
+        chosen.isp = _first_str(subsystems.get("wan", {}), "isp_name") or _first_str(
+            www, "isp_name", "isp_organization"
+        )
+    if chosen.uptime_s is None:
+        chosen.uptime_s = _first_num(www, "uptime")
+    if chosen.latency_ms is None:
+        chosen.latency_ms = _first_num(www, "latency")
+
     return links
 
 
