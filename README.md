@@ -114,11 +114,10 @@ screen with no panel or wallpaper.
 Edit the file to set (or remove) the display-mode line, then turn off screen
 blanking in `sudo raspi-config` -> Display Options -> Screen Blanking. Reboot.
 
-If your panel's native mode is missing from `wlr-randr`, a
-`--custom-mode` line here is usually less brittle than a `video=` argument in
-`/boot/firmware/cmdline.txt`, which OS updates can rewrite. Note that
-`cmdline.txt` is a **single line** — parameters are appended to the existing
-line, space-separated; a second line is ignored.
+Do not set the display mode in this file: on Pi OS the labwc session runs
+kanshi, which owns output configuration and will stamp over it. If your panel
+does not come up at its native resolution — common with 1280x400 bar displays —
+see [docs/display-modes.md](docs/display-modes.md).
 
 Raspberry Pi OS Bookworm and later run labwc; on an older Wayfire image the
 equivalent goes in `~/.config/wayfire.ini` under `[autostart]`.
