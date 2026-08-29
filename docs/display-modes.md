@@ -120,15 +120,55 @@ Then in `/boot/firmware/cmdline.txt` - still one line - **replace** any
 drm.edid_firmware=HDMI-A-1:edid/pi_1280x400.bin
 ```
 
-Replace rather than add. A forced `video=` mode and an EDID-declared mode for
-the same resolution produce slightly different timings (a CVT-derived
-`59.999001` against this blob's `60.003307`), and keeping both leaves two
+Replace the *mode* rather than adding to it: a forced `video=` mode and an
+EDID-declared mode for the same resolution produce slightly different timings
+(a CVT-derived `59.999001` against this blob's `60.003307`), leaving two
 near-identical modes in the list and no easy way to tell which is live.
 
-Reboot and confirm with `wlr-randr`. If the connector comes up with its
-original modes and no error, the EDID was requested before the root
-filesystem was available - the DRM driver can probe that early - and the blob
-needs to go into the initramfs.
+**Keep the force-enable flag, though.** It is orthogonal to the mode, and this
+is the one case where both parameters belong on the line together - the EDID
+supplies the timing, `video=` only forces the connector on:
+
+```
+drm.edid_firmware=HDMI-A-1:edid/pi_1280x400.bin video=HDMI-A-1:e
+```
+
+Reboot and confirm with `wlr-randr`.
+
+## Black on cold boot, correct after re-plugging the cable
+
+A display that works when you unplug and reconnect HDMI, but comes up black
+from a cold boot, is telling you the mode is right and something is only
+available *after* boot. Two causes, distinguished over SSH while the screen is
+black:
+
+```bash
+cat /sys/class/drm/card*-HDMI-A-1/status
+sudo dmesg | grep -iE 'edid|firmware|hdmi-a-1|drm' | head -40
+```
+
+**`disconnected`** - the panel does not assert hotplug-detect until it has
+powered up, so the Pi probes, sees nothing, and disables the output. Force the
+connector on with the `e` suffix: `video=HDMI-A-1:e`, or
+`video=HDMI-A-1:1280x400M@60e` if you are not using an EDID blob.
+
+**`connected`, with `Direct firmware load for edid/... failed with error -2`
+in dmesg** - DRM probed before the root filesystem was available, so the blob
+could not be read. Either drop `drm.edid_firmware` and force the mode with
+`video=HDMI-A-1:1280x400M@60e`, which needs no file at probe time, or put the
+blob in the initramfs:
+
+```bash
+sudo tee /etc/initramfs-tools/hooks/edid >/dev/null <<'HOOK'
+#!/bin/sh
+[ "$1" = prereqs ] && { echo; exit 0; }
+. /usr/share/initramfs-tools/hook-functions
+mkdir -p "${DESTDIR}/lib/firmware/edid"
+cp /lib/firmware/edid/pi_1280x400.bin "${DESTDIR}/lib/firmware/edid/"
+HOOK
+sudo chmod +x /etc/initramfs-tools/hooks/edid
+sudo update-initramfs -u
+```
 
 ### Rolling your own
 
