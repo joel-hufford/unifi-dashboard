@@ -59,3 +59,16 @@ def test_debug_wan_endpoint_exposes_uplinks_without_client_detail():
         assert "clients" not in payload
         blob = str(payload)
         assert "essid" not in blob and "hostname" not in blob
+
+
+def test_assets_are_version_stamped_and_never_cached_independently():
+    # A fresh index.html paired with a stale app.js means the script hunts for
+    # elements that no longer exist and the page dies on a null dereference.
+    with demo_client() as client:
+        page = client.get("/")
+        assert page.headers["cache-control"] == "no-store"
+        assert "/static/app.js?v=" in page.text
+        assert "/static/styles.css?v=" in page.text
+
+        asset = client.get("/static/app.js")
+        assert "no-cache" in asset.headers["cache-control"]

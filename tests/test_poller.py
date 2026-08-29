@@ -1,3 +1,5 @@
+import random
+
 import pytest
 
 from unifi_dashboard.config import Config
@@ -10,7 +12,13 @@ def make_poller(**overrides):
     cfg = Config(demo=True, poll_interval=1.0)
     for key, value in overrides.items():
         setattr(cfg, key, value)
-    return Poller(cfg, History(":memory:"))
+    poller = Poller(cfg, History(":memory:"))
+    if poller.demo is not None:
+        # The demo source drops every ping 0.5% of the time by design, which
+        # makes assertions about latency flaky roughly once in two hundred
+        # runs. Seed it so a failure means something.
+        poller.demo.rng = random.Random(1)
+    return poller
 
 
 def test_reported_rates_are_used_as_is():

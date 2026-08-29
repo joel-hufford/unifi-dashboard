@@ -7,8 +7,9 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 
 from fastapi import FastAPI, HTTPException, Query
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
+from starlette.types import Scope
 
 from .config import Config
 from .metrics import _WAN_KEY, find_gateway
@@ -20,6 +21,32 @@ log = logging.getLogger(__name__)
 STATIC_DIR = Path(__file__).parent / "static"
 
 MAX_WINDOW_MINUTES = 1440
+
+
+def asset_version() -> str:
+    """A build id from the newest static file.
+
+    The page and its assets must never be cached independently: a fresh
+    index.html paired with a stale app.js means the script looks for elements
+    that no longer exist, and the dashboard dies with a null dereference. The
+    id is stamped into the asset URLs so a new build cannot be paired with an
+    old one.
+    """
+    newest = 0.0
+    for path in STATIC_DIR.glob("*"):
+        if path.is_file():
+            newest = max(newest, path.stat().st_mtime)
+    return f"{int(newest)}"
+
+
+class NoCacheStatic(StaticFiles):
+    """Static assets on a kiosk are served over loopback, so revalidating
+    every time costs nothing and removes a whole class of stale-asset bug."""
+
+    def file_response(self, *args, **kwargs):
+        response = super().file_response(*args, **kwargs)
+        response.headers["Cache-Control"] = "no-cache, must-revalidate"
+        return response
 
 
 def create_app(cfg: Config) -> FastAPI:
@@ -89,7 +116,11 @@ def create_app(cfg: Config) -> FastAPI:
         page = STATIC_DIR / "index.html"
         if not page.is_file():
             raise HTTPException(status_code=500, detail="static assets are missing")
-        return FileResponse(page, headers={"Cache-Control": "no-store"})
+        version = asset_version()
+        html = page.read_text(encoding="utf-8")
+        for asset in ("styles.css", "app.js"):
+            html = html.replace(f"/static/{asset}", f"/static/{asset}?v={version}")
+        return HTMLResponse(html, headers={"Cache-Control": "no-store"})
 
-    app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
+    app.mount("/static", NoCacheStatic(directory=STATIC_DIR), name="static")
     return app

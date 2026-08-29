@@ -74,10 +74,22 @@
 
   async function refresh() {
     document.body.classList.add("is-refreshing");
+    let payload;
     try {
       const response = await fetch(`/api/dashboard?minutes=${state.minutes}`, { cache: "no-store" });
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
-      const payload = await response.json();
+      payload = await response.json();
+    } catch (error) {
+      showBanner("critical", `Dashboard server unreachable (${error.message})`);
+      return;
+    } finally {
+      document.body.classList.remove("is-refreshing");
+    }
+
+    // Rendering is a separate failure with a separate cause. Reporting a
+    // rendering crash as "server unreachable" sends you to look at the wrong
+    // machine entirely.
+    try {
       const first = state.data === null;
       state.data = payload;
       if (first && payload.config && payload.config.theme) {
@@ -85,9 +97,11 @@
       }
       render();
     } catch (error) {
-      showBanner("critical", `Dashboard server unreachable (${error.message})`);
-    } finally {
-      document.body.classList.remove("is-refreshing");
+      console.error("render failed", error);
+      showBanner(
+        "critical",
+        `Display error - try a hard refresh (Ctrl+Shift+R): ${error.message}`,
+      );
     }
   }
 
