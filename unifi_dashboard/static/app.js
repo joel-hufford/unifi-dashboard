@@ -287,11 +287,24 @@
     $("kpi-clients-sub").textContent =
       `${num(clients.wireless)} Wi-Fi · ${num(clients.wired)} wired${clients.guest ? ` · ${clients.guest} guest` : ""}`;
 
+    // With nothing connected there is no score to show. An empty meter beside
+    // a dash reads as broken; say "none" and drop the meter instead.
+    const meter = $("kpi-wlan-meter");
+    const idle = !wlan.rated;
+    meter.hidden = idle;
+
+    if (idle) {
+      $("kpi-wlan").textContent = "None";
+      $("kpi-wlan-word").textContent = "connected";
+      $("kpi-wlan-sub").textContent =
+        clients.wired ? "no wireless clients · wired only" : "no clients connected";
+      return;
+    }
+
     const score = wlan.score;
     const band = qualityBand(score);
     $("kpi-wlan").textContent = score == null ? "—" : Math.round(score);
     $("kpi-wlan-word").textContent = band.label;
-    const meter = $("kpi-wlan-meter");
     meter.style.setProperty("--meter-color", `var(--${band.token})`);
     $("kpi-wlan-fill").style.width = `${score == null ? 0 : Math.max(2, Math.min(100, score))}%`;
     meter.setAttribute(
@@ -299,7 +312,7 @@
       `Wi-Fi quality score ${score == null ? "unknown" : Math.round(score)} out of 100, ${band.label}`,
     );
     $("kpi-wlan-sub").textContent =
-      wlan.rated ? `${wlan.weak} weak of ${wlan.rated} clients · mean ${ms(wlan.mean_signal_dbm, 0)} dBm` : "no wireless clients";
+      `${wlan.weak} weak of ${wlan.rated} clients · mean ${ms(wlan.mean_signal_dbm, 0)} dBm`;
   }
 
   function lossStatus(loss) {

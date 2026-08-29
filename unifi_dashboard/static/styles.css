@@ -401,6 +401,8 @@ body {
 .status-mark[data-status="serious"]  { background: var(--serious); }
 .status-mark[data-status="critical"] { background: var(--critical); }
 
+.meter[hidden] { display: none; }
+
 .meter {
   height: 8px;
   margin: 6px 0 4px;
