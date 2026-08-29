@@ -29,6 +29,13 @@ fi
 FLAGS=(
   --kiosk
   --user-data-dir="$PROFILE"
+  # Chromium keeps profile secrets in the system keyring. Under auto-login the
+  # login keyring is never unlocked, so it opens an "Authentication Required"
+  # dialog at startup and waits - on a wall panel with no keyboard. This
+  # profile only ever loads 127.0.0.1 and stores nothing worth protecting.
+  --password-store=basic
+  --no-first-run
+  --no-default-browser-check
   --noerrdialogs
   --disable-infobars
   --disable-session-crashed-bubble
