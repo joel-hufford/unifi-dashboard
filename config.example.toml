@@ -1,6 +1,21 @@
 # Copy to config.toml (or ~/.config/unifi-dashboard/config.toml) and edit.
-# Secrets can also come from the environment, which is preferred for systemd:
-#   UNIFI_DASHBOARD_API_KEY, UNIFI_DASHBOARD_USERNAME, UNIFI_DASHBOARD_PASSWORD
+#
+# Any of these settings can come from the environment instead, which the
+# systemd unit reads from /etc/unifi-dashboard/secrets.env. The environment
+# wins where both are set; an unset or empty variable is ignored.
+#
+#   UNIFI_DASHBOARD_API_KEY     unifi.api_key
+#   UNIFI_DASHBOARD_USERNAME    unifi.username
+#   UNIFI_DASHBOARD_PASSWORD    unifi.password
+#   UNIFI_DASHBOARD_HOST        unifi.host
+#   UNIFI_DASHBOARD_SITE        unifi.site
+#   UNIFI_DASHBOARD_DEMO        demo mode (1/true/yes/on)
+#
+# Worth putting there: the credentials, and the console address if you would
+# rather not have your internal addressing in a file you might share. If you
+# do move a value out, leave a comment in its place - a config file that
+# silently disagrees with what the service is using costs you an afternoon
+# later.
 
 # Seconds between controller polls. 10s keeps the load on the console trivial
 # while still giving a 360-point graph over one hour.
