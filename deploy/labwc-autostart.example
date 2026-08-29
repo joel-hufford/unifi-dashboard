@@ -14,6 +14,15 @@
 # add to it. On Pi OS the system file is what starts the desktop panel and
 # wallpaper, so copy it first unless you want a bare kiosk screen.
 #
+# Copy it ONCE. Appending the system file a second time gives you two panels,
+# two desktops, and two of anything else it launches. If you are redoing this,
+# edit the existing file rather than appending to it again.
+#
+# On a short panel - a 1280x400 bar display especially - consider not starting
+# the desktop panel at all: it costs 30-odd pixels of a screen that has none
+# to spare, on a machine nobody is going to use as a desktop. A kiosk
+# autostart can be this one line and nothing else.
+#
 # Do NOT set the display mode here. On Raspberry Pi OS the labwc session runs
 # kanshi, which owns output configuration and re-applies its own profile on
 # every hotplug - anything wlr-randr does from this file gets stamped over.
