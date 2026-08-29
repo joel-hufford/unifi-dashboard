@@ -120,6 +120,11 @@ Then in `/boot/firmware/cmdline.txt` - still one line - **replace** any
 drm.edid_firmware=HDMI-A-1:edid/pi_1280x400.bin
 ```
 
+The path is **case-sensitive** and is relative to `/lib/firmware`. `EDID/` in
+place of `edid/` fails silently: the connector comes up without the blob, and
+on a panel with slow hotplug-detect that means a black screen from cold boot
+that fixes itself the moment you re-plug the cable.
+
 Replace the *mode* rather than adding to it: a forced `video=` mode and an
 EDID-declared mode for the same resolution produce slightly different timings
 (a CVT-derived `59.999001` against this blob's `60.003307`), leaving two
