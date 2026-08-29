@@ -64,6 +64,15 @@ latency_ms_critical = 400.0
 # it is something you want to notice the same day. Amber by default.
 failover_is_critical = false
 
+[charts]
+# Small-site WAN traffic is idle most of the time with rare bursts, which a
+# linear axis scaled to the peak renders as a flat line on the baseline.
+# "log" keeps ordinary traffic legible without clipping the peak; "linear" is
+# truer to magnitude and fine on a consistently busy link.
+throughput_scale = "log"
+# Decades the log axis spans below its top. Three covers roughly 0.5-500 Mbps.
+log_decades = 3.0
+
 [ui]
 # The theme the panel starts in: "dark" or "light". The on-screen toggle only
 # changes the current session, so a stray touch corrects itself on the next

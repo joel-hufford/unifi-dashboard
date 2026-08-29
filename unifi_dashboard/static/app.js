@@ -323,12 +323,17 @@
     $("stats-latency").textContent =
       `avg ${ms(win.avg_latency_ms)} · max ${ms(win.max_latency_ms)} ms · ${win.loss_pct == null ? "—" : win.loss_pct.toFixed(1)}% loss`;
 
+    const scale = data.config?.throughput_scale || "log";
+    const decades = data.config?.log_decades || 3;
+
     drawPanel("plot-down", {
       ts: series.ts,
       values: series.rx_bps,
       color: "var(--series-down)",
       format: (v) => rateIn(v, downUnit),
       unitLabel: downUnit.unit,
+      scale,
+      decades,
     });
     drawPanel("plot-up", {
       ts: series.ts,
@@ -336,6 +341,8 @@
       color: "var(--series-up)",
       format: (v) => rateIn(v, upUnit),
       unitLabel: upUnit.unit,
+      scale,
+      decades,
     });
     drawPanel("plot-latency", {
       ts: series.ts,
@@ -392,13 +399,30 @@
     const peak = finite.length ? Math.max(...finite) : 0;
     const top = niceCeiling(peak * 1.12) || 1;
 
-    const x = (i) => (count <= 1 ? plot.left : plot.left + (i / (count - 1)) * plot.width);
-    const y = (v) => plot.bottom - Math.max(0, Math.min(1, v / top)) * plot.height;
+    // A WAN that is idle most of the time with rare bursts has a dynamic
+    // range a linear axis cannot show: the line flattens onto the baseline and
+    // one spike owns the scale. A log axis spanning a few decades keeps
+    // ordinary traffic legible without clipping the peak.
+    const useLog = opts.scale === "log" && peak > 0;
+    const floor = useLog ? top / Math.pow(10, opts.decades || 3) : 0;
 
-    // Recessive chrome: solid hairlines, one step off the surface.
-    for (const fraction of [0, 0.5]) {
+    const x = (i) => (count <= 1 ? plot.left : plot.left + (i / (count - 1)) * plot.width);
+    const y = (v) => {
+      if (!useLog) return plot.bottom - Math.max(0, Math.min(1, v / top)) * plot.height;
+      if (v == null || !isFinite(v) || v <= floor) return plot.bottom;
+      return plot.bottom - Math.min(1, Math.log(v / floor) / Math.log(top / floor)) * plot.height;
+    };
+
+    // Recessive chrome: solid hairlines, one step off the surface. On a log
+    // axis they mark the decades, which is what makes it readable as one.
+    const gridValues = [];
+    if (useLog) {
+      for (let value = top; value > floor * 1.0001; value /= 10) gridValues.push(y(value));
+    } else {
+      gridValues.push(plot.top, plot.top + 0.5 * plot.height);
+    }
+    for (const yy of gridValues) {
       const line = document.createElementNS(SVG_NS, "line");
-      const yy = plot.top + fraction * plot.height;
       line.setAttribute("x1", plot.left);
       line.setAttribute("x2", plot.right);
       line.setAttribute("y1", yy);
@@ -421,7 +445,7 @@
     if (current.length) segments.push(current);
 
     for (const points of segments) {
-      if (points.length > 1) {
+      if (points.length > 1 && !useLog) {
         const area = document.createElementNS(SVG_NS, "path");
         const d =
           `M ${points[0][0]} ${plot.bottom} ` +
@@ -465,7 +489,9 @@
     }
 
     // The scale top, labelled directly - so no value depends on the tooltip.
-    label(svg, plot.left + 2, plot.top - 4, `${opts.format(top)} ${opts.unitLabel}`, "start");
+    // Saying "log" matters: an unlabelled log axis misleads about magnitude.
+    const topLabel = `${opts.format(top)} ${opts.unitLabel}${useLog ? " · log" : ""}`;
+    label(svg, plot.left + 2, plot.top - 4, topLabel, "start");
 
     // One selective direct label: the window peak.
     const peakIndex = values.reduce(

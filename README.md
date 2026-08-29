@@ -35,6 +35,20 @@ page, so the averages always agree with the plots. Tapping a chart shows a
 crosshair with all three series at that moment, and the `Table` button swaps
 the plots for the same data in five-minute buckets.
 
+## Chart scale
+
+Throughput is drawn on a **log axis by default**. A small-site WAN is idle most
+of the time with occasional bursts - a 200:1 dynamic range is normal - and a
+linear axis scaled to the peak renders that as a flat line on the baseline with
+one spike owning the scale. Log keeps ordinary traffic legible without clipping
+or misrepresenting the peak: gridlines mark the decades, the axis top is
+labelled `· log`, and the area wash is dropped because area under a log curve
+is not proportional to the value.
+
+Set `throughput_scale = "linear"` under `[charts]` if your link is busy enough
+that magnitude comparison matters more. Latency is always linear - its range is
+naturally narrow, and log latency reads badly.
+
 ## The alarm state
 
 The panel's first job is to answer "is the internet working" from across the

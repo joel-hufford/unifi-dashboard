@@ -34,7 +34,10 @@ def main(argv: list[str] | None = None) -> int:
     cfg = Config.load(args.config)
     if args.demo or args.demo_fault != "none":
         cfg.demo = True
-    cfg.demo_fault = args.demo_fault
+    # Only override when the flag was actually given: assigning the argparse
+    # default unconditionally would silently discard the config file's value.
+    if args.demo_fault != "none":
+        cfg.demo_fault = args.demo_fault
     if args.host:
         cfg.server.host = args.host
     if args.port:

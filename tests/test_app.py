@@ -41,3 +41,21 @@ def test_index_and_assets_are_served():
 def test_healthz():
     with demo_client() as client:
         assert client.get("/api/healthz").json()["ok"] is True
+
+
+def test_chart_scale_is_published_to_the_page():
+    with demo_client() as client:
+        config = client.get("/api/dashboard").json()["config"]
+        assert config["throughput_scale"] == "log"
+        assert config["log_decades"] == 3.0
+
+
+def test_debug_wan_endpoint_exposes_uplinks_without_client_detail():
+    with demo_client() as client:
+        payload = client.get("/api/debug/wan").json()
+        assert set(payload["wan_interfaces"]) == {"wan1", "wan3"}
+        assert [link["key"] for link in payload["parsed"]] == ["wan1", "wan3"]
+        # Uplink detail only: no client names or MAC addresses ride along.
+        assert "clients" not in payload
+        blob = str(payload)
+        assert "essid" not in blob and "hostname" not in blob
