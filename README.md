@@ -49,6 +49,23 @@ Set `throughput_scale = "linear"` under `[charts]` if your link is busy enough
 that magnitude comparison matters more. Latency is always linear - its range is
 naturally narrow, and log latency reads badly.
 
+## The client directory
+
+The **Connected devices** tile is a button. Tapping it opens a full-screen
+directory of every client with its address, name, network, how it is connected
+and its signal, sorted by address - numerically, so `.9` comes before `.10`.
+
+It is paged rather than scrolled: thumb-sized Previous / Next buttons and a
+Close button, because a scrollbar on a wall panel is something you chase rather
+than use. The page size is measured from the space actually available, and on a
+wide short display the list runs in two columns filled top-to-bottom, which
+roughly halves the paging.
+
+The list is fetched from `/api/clients` when opened, not included in the
+polling payload - the panel is usually not showing it, and shipping every
+client every few seconds would be waste. It is served from the last poll, so it
+is at most one interval old, and the header says how old.
+
 ## The alarm state
 
 The panel's first job is to answer "is the internet working" from across the

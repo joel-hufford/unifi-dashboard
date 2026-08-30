@@ -19,6 +19,12 @@
     touchTimer: null,
   };
 
+  // The client directory is fetched on open, not polled: it is a thing you go
+  // and look at, and repaginating under someone's finger would be hostile.
+  const clients = { rows: [], page: 0, perPage: 8, perColumn: 8, columns: 1, fetchedAt: null };
+  const CLIENT_ROW_HEIGHT = 34;
+  const CLIENT_COLUMN_WIDTH = 620;
+
   const $ = (id) => document.getElementById(id);
 
   /* ---------------------------------------------------------------- format */
@@ -865,6 +871,119 @@
     $("kpi-gear").textContent = gear;
   }
 
+  /* ---------------------------------------------------------- client list */
+
+  async function openClients() {
+    const overlay = $("clients-overlay");
+    overlay.hidden = false;
+
+    try {
+      const response = await fetch("/api/clients", { cache: "no-store" });
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      const payload = await response.json();
+      clients.rows = payload.clients || [];
+      clients.fetchedAt = payload.generated_at;
+      clients.page = 0;
+    } catch (error) {
+      console.error("client list failed", error);
+      clients.rows = [];
+      clients.fetchedAt = null;
+    }
+
+    // Fit the page to the space actually available rather than guessing.
+    const body = $("clients-body");
+    const available = body.clientHeight - $("clients-head").offsetHeight;
+    clients.perColumn = Math.max(1, Math.floor(available / CLIENT_ROW_HEIGHT));
+    clients.columns = Math.max(1, Math.floor(body.clientWidth / CLIENT_COLUMN_WIDTH));
+    clients.perPage = clients.perColumn * clients.columns;
+    renderClients();
+    $("clients-close").focus();
+  }
+
+  function closeClients() {
+    $("clients-overlay").hidden = true;
+    $("clients-open").focus();
+  }
+
+  function renderClients() {
+    const pages = Math.max(1, Math.ceil(clients.rows.length / clients.perPage));
+    clients.page = Math.min(clients.page, pages - 1);
+    const start = clients.page * clients.perPage;
+    const slice = clients.rows.slice(start, start + clients.perPage);
+
+    const host = $("clients-rows");
+    const columns = `repeat(${clients.columns}, minmax(0, 1fr))`;
+    host.replaceChildren();
+    // Explicit row count is what makes the column flow fill downwards first;
+    // explicit columns keep them equal so the headers line up.
+    host.style.gridTemplateRows = `repeat(${clients.perColumn}, ${CLIENT_ROW_HEIGHT}px)`;
+    host.style.gridTemplateColumns = columns;
+
+    const headHost = $("clients-head");
+    headHost.replaceChildren();
+    headHost.style.gridTemplateColumns = columns;
+    for (let column = 0; column < clients.columns; column += 1) {
+      const header = document.createElement("div");
+      header.className = "client-row client-head";
+      for (const [text, className] of [
+        ["Address", ""], ["Name", ""], ["Network", ""], ["Connection", ""], ["Signal", "right"],
+      ]) {
+        const cell = document.createElement("span");
+        if (className) cell.className = className;
+        cell.textContent = text;
+        header.appendChild(cell);
+      }
+      headHost.appendChild(header);
+    }
+
+    if (!clients.rows.length) {
+      const empty = document.createElement("div");
+      empty.className = "client-row";
+      empty.textContent = "No clients reported.";
+      host.appendChild(empty);
+    }
+
+    for (const client of slice) {
+      const row = document.createElement("div");
+      row.className = "client-row";
+
+      const cells = [
+        [client.ip || "—", "client-ip"],
+        [client.name || client.mac, "client-title"],
+        [client.network || (client.guest ? "guest" : "—"), ""],
+        [
+          client.wired
+            ? `Wired${client.ap ? ` · ${client.ap}` : ""}`
+            : [client.ssid, client.ap].filter(Boolean).join(" · ") || "Wi-Fi",
+          "",
+        ],
+        [client.signal_dbm == null ? "—" : `${Math.round(client.signal_dbm)} dBm`, "client-sig right"],
+      ];
+
+      for (const [text, className] of cells) {
+        const cell = document.createElement("span");
+        if (className) cell.className = className;
+        cell.textContent = text;          // client names are untrusted data
+        row.appendChild(cell);
+      }
+      host.appendChild(row);
+    }
+
+    const shown = clients.rows.length ? `${start + 1}-${start + slice.length} of ${clients.rows.length}` : "0";
+    $("clients-page").textContent = `${shown}   ·   page ${clients.page + 1} of ${pages}`;
+    $("clients-prev").disabled = clients.page === 0;
+    $("clients-next").disabled = clients.page >= pages - 1;
+
+    const age = relativeAge(clients.fetchedAt);
+    $("clients-sub").textContent = age ? `as of ${age}` : "";
+  }
+
+  function turnPage(delta) {
+    const pages = Math.max(1, Math.ceil(clients.rows.length / clients.perPage));
+    clients.page = Math.max(0, Math.min(pages - 1, clients.page + delta));
+    renderClients();
+  }
+
   /* ----------------------------------------------------------------- table */
 
   function renderTable(data) {
@@ -935,6 +1054,14 @@
         refresh();
       });
     }
+
+    $("clients-open").addEventListener("click", openClients);
+    $("clients-close").addEventListener("click", closeClients);
+    $("clients-prev").addEventListener("click", () => turnPage(-1));
+    $("clients-next").addEventListener("click", () => turnPage(1));
+    document.addEventListener("keydown", (event) => {
+      if (event.key === "Escape" && !$("clients-overlay").hidden) closeClients();
+    });
 
     $("public-refresh").addEventListener("click", async (event) => {
       const button = event.currentTarget;

@@ -225,3 +225,51 @@ def test_link_speed_exposes_an_underperforming_port(ucg_max):
     assert primary.max_speed_mbps == 2500      # negotiated below capability
     assert primary.prefix == 24
     assert primary.mac
+
+
+# --- the client directory --------------------------------------------------
+
+def test_client_list_sorts_by_address_numerically(clients):
+    rows = metrics.client_list_from(clients)
+    # String ordering would put .10 before .9; addresses have to sort as numbers.
+    listed = [c for c in [
+        {"mac": "a", "ip": "10.0.0.10"}, {"mac": "b", "ip": "10.0.0.9"},
+        {"mac": "c", "ip": "10.0.0.100"},
+    ]]
+    assert [row.ip for row in metrics.client_list_from(listed)] == \
+        ["10.0.0.9", "10.0.0.10", "10.0.0.100"]
+    assert len(rows) == len(clients)
+
+
+def test_clients_without_an_address_sort_last():
+    rows = metrics.client_list_from([
+        {"mac": "a", "name": "No lease"},
+        {"mac": "b", "name": "Has one", "ip": "10.0.0.5"},
+    ])
+    assert [row.name for row in rows] == ["Has one", "No lease"]
+
+
+def test_client_entries_carry_what_the_directory_shows(clients):
+    rows = {row.mac: row for row in metrics.client_list_from(clients)}
+
+    wireless = rows["aa:bb:cc:00:00:03"]
+    assert wireless.name == "Joel's MacBook"
+    assert wireless.wired is False
+    assert wireless.ssid == "Home"
+    assert wireless.ap == "Office AP"
+    assert wireless.signal_dbm == -52
+
+    wired = rows["aa:bb:cc:00:00:01"]
+    assert wired.wired is True
+    assert wired.signal_dbm is None      # a cable has no signal strength
+
+
+def test_unnamed_clients_fall_back_to_vendor_then_mac():
+    # Addressless clients sort by name, so look them up rather than assuming
+    # the order they were passed in.
+    rows = {row.mac: row for row in metrics.client_list_from([
+        {"mac": "aa:bb:cc:00:00:09", "oui": "Espressif"},
+        {"mac": "aa:bb:cc:00:00:0a"},
+    ])}
+    assert rows["aa:bb:cc:00:00:09"].name == "Espressif"
+    assert rows["aa:bb:cc:00:00:0a"].name == "aa:bb:cc:00:00:0a"

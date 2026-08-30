@@ -106,12 +106,13 @@
     </section>
 
     <section class="kpis" aria-label="Network counts">
-      <article class="tile">
-        <h2 class="tile-label">Connected devices</h2>
-        <p class="tile-value" id="kpi-clients">—</p>
-        <p class="tile-sub" id="kpi-clients-sub">—</p>
-        <p class="tile-sub compact-only" id="kpi-gear">—</p>
-      </article>
+      <button type="button" class="tile tile-action" id="clients-open"
+              aria-haspopup="dialog" aria-label="Connected devices - open the list">
+        <span class="tile-label">Connected devices<span class="chevron" aria-hidden="true">›</span></span>
+        <span class="tile-value" id="kpi-clients">—</span>
+        <span class="tile-sub" id="kpi-clients-sub">—</span>
+        <span class="tile-sub compact-only" id="kpi-gear">—</span>
+      </button>
 
       <article class="tile">
         <h2 class="tile-label">Wi-Fi quality</h2>
@@ -198,6 +199,29 @@
     </section>
 
   </main>
+
+  <!-- The client directory. Kept out of the polling payload and fetched only
+       when opened, since the panel usually is not showing it. -->
+  <div class="overlay" id="clients-overlay" hidden role="dialog" aria-modal="true"
+       aria-labelledby="clients-title">
+    <div class="overlay-head">
+      <h2 class="overlay-title" id="clients-title">Connected devices</h2>
+      <span class="overlay-sub" id="clients-sub">—</span>
+      <div class="topbar-spacer"></div>
+      <button type="button" class="pager pager-close" id="clients-close">Close</button>
+    </div>
+
+    <div class="client-table" id="clients-body">
+      <div id="clients-head" aria-hidden="true"></div>
+      <div id="clients-rows"></div>
+    </div>
+
+    <div class="overlay-foot">
+      <button type="button" class="pager" id="clients-prev">▲ Previous</button>
+      <span class="pager-label" id="clients-page">—</span>
+      <button type="button" class="pager" id="clients-next">Next ▼</button>
+    </div>
+  </div>
 </div>
 <script src="/static/app.js"></script>
 </body>

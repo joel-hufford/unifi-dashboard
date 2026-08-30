@@ -457,6 +457,107 @@ body {
   transition: width 400ms ease;
 }
 
+/* Tappable tile ------------------------------------------------------------ */
+
+.tile-action {
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  color: inherit;
+}
+.tile-action:active { background: var(--ghost); }
+
+.chevron {
+  margin-left: 6px;
+  font-size: 15px;
+  line-height: 1;
+  color: var(--text-muted);
+}
+
+/* Client directory --------------------------------------------------------- */
+
+.overlay[hidden] { display: none; }
+
+.overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 40;                 /* below the alarm frame: a fault stays visible */
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px 12px 12px;
+  background: var(--page);
+}
+
+.overlay-head { display: flex; align-items: baseline; gap: 12px; }
+.overlay-title { margin: 0; font-size: 19px; font-weight: 600; color: var(--text-primary); }
+.overlay-sub { font-size: 13px; color: var(--text-muted); }
+
+.client-table {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: hidden;            /* paged, never scrolled: no scrollbar to chase */
+  border-top: 1px solid var(--border);
+}
+
+/* A bar display is very wide and very short, so the directory runs in
+   columns: one column wastes ~600px of width and doubles the paging. Filled
+   top-to-bottom, then across. */
+#clients-rows, #clients-head {
+  display: grid;
+  grid-auto-flow: column;
+  column-gap: 28px;
+}
+
+.client-row {
+  display: grid;
+  grid-template-columns: 118px minmax(0, 1fr) 74px 168px 68px;
+  align-items: center;
+  gap: 10px;
+  height: 34px;
+  padding: 0 2px;
+  border-bottom: 1px solid var(--border);
+  font-size: 14px;
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+.client-row > span { overflow: hidden; text-overflow: ellipsis; }
+.client-row .right { text-align: right; }
+
+/* Repeated once per column: a single header spanning the whole width would
+   label positions the data does not occupy. */
+.client-head {
+  height: 26px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  border-bottom-color: var(--axis);
+}
+
+.client-ip { font-variant-numeric: tabular-nums; font-family: ui-monospace, Menlo, Consolas, monospace; }
+.client-title { color: var(--text-primary); font-weight: 600; }
+.client-sig { font-variant-numeric: tabular-nums; }
+
+.overlay-foot { display: flex; align-items: center; gap: 12px; }
+
+.pager {
+  min-height: 46px;            /* thumb-sized: this is the whole point */
+  min-width: 132px;
+  padding: 0 18px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface-1);
+  color: var(--text-primary);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+.pager:disabled { opacity: 0.4; cursor: default; }
+.pager-close { margin-left: auto; min-width: 104px; }
+.pager-label { flex: 1 1 auto; text-align: center; font-size: 14px; color: var(--text-secondary); }
+
 /* Charts ------------------------------------------------------------------ */
 
 .card-head {

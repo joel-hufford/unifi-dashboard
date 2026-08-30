@@ -12,7 +12,9 @@ from fastapi.staticfiles import StaticFiles
 from starlette.types import Scope
 
 from .config import Config
-from .metrics import _WAN_KEY, find_gateway
+from dataclasses import asdict
+
+from .metrics import _WAN_KEY, client_list_from, find_gateway
 from .poller import Poller
 from .storage import History
 from .unifi_client import UniFiClient
@@ -84,6 +86,22 @@ def create_app(cfg: Config) -> FastAPI:
         # 200 even when the controller is down: the page wants the last good
         # snapshot plus the error, not an exception.
         return JSONResponse(payload)
+
+    @app.get("/api/clients")
+    async def clients():
+        """The full client directory, for the on-screen list.
+
+        Served from the last poll rather than a fresh controller call: it is at
+        most one poll interval old, and this endpoint is hit every time someone
+        opens the list. It is deliberately not part of /api/dashboard, which is
+        fetched every few seconds by a panel that usually is not showing it.
+        """
+        entries = client_list_from(poller.last_raw.get("clients") or [])
+        return JSONResponse({
+            "generated_at": poller.last_success,
+            "count": len(entries),
+            "clients": [asdict(entry) for entry in entries],
+        })
 
     @app.post("/api/public-ip/refresh")
     async def refresh_public_ip():

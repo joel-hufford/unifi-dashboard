@@ -134,6 +134,23 @@ class WanLink:
 
 
 @dataclass
+class ClientEntry:
+    """One connected client, as the on-screen directory shows it."""
+
+    name: str
+    mac: str
+    ip: str | None = None
+    wired: bool = False
+    network: str | None = None            # the network/VLAN it landed on
+    ssid: str | None = None
+    ap: str | None = None
+    signal_dbm: float | None = None
+    uptime_s: float | None = None
+    vendor: str | None = None             # OUI lookup, for unnamed devices
+    guest: bool = False
+
+
+@dataclass
 class ClientCounts:
     total: int = 0
     wireless: int = 0
@@ -379,6 +396,41 @@ def wan_from(health: list[dict], devices: list[dict]) -> WanStatus:
     status.speedtest_ping_ms = _first_num(www, "speedtest_ping")
     status.speedtest_ts = _first_num(www, "speedtest_lastrun")
     return status
+
+
+def _ip_sort_key(entry: ClientEntry) -> tuple:
+    """Sort by address, numerically. Clients without one sort last, by name."""
+    if not entry.ip:
+        return (2, 0, entry.name.lower())
+    try:
+        import ipaddress
+        return (0, int(ipaddress.ip_address(entry.ip)), "")
+    except ValueError:
+        return (1, 0, entry.ip)
+
+
+def client_list_from(clients: list[dict]) -> list[ClientEntry]:
+    entries = [
+        ClientEntry(
+            name=(
+                _first_str(client, "name", "hostname", "display_name")
+                or _first_str(client, "oui")
+                or client.get("mac", "unknown")
+            ),
+            mac=client.get("mac", ""),
+            ip=_first_str(client, "ip", "fixed_ip"),
+            wired=bool(client.get("is_wired")),
+            network=_first_str(client, "network", "network_name"),
+            ssid=_first_str(client, "essid"),
+            ap=_first_str(client, "ap_displayname", "ap_name", "sw_name"),
+            signal_dbm=None if client.get("is_wired") else signal_of(client),
+            uptime_s=_num(client.get("uptime")),
+            vendor=_first_str(client, "oui"),
+            guest=bool(client.get("is_guest")),
+        )
+        for client in clients or []
+    ]
+    return sorted(entries, key=_ip_sort_key)
 
 
 def clients_from(clients: list[dict]) -> ClientCounts:

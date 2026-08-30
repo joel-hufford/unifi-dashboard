@@ -80,3 +80,21 @@ def test_public_ip_can_be_rechecked_on_demand():
         response = client.post("/api/public-ip/refresh")
         assert response.status_code == 200
         assert response.json()["address"] == "198.51.100.7"
+
+
+def test_client_directory_endpoint():
+    with demo_client() as client:
+        client.get("/api/dashboard")           # prime a poll
+        payload = client.get("/api/clients").json()
+
+        assert payload["count"] == len(payload["clients"])
+        assert payload["count"] > 0
+        first = payload["clients"][0]
+        assert set(first) >= {"name", "mac", "ip", "wired", "network", "ssid", "ap", "signal_dbm"}
+
+
+def test_client_directory_is_not_in_the_polling_payload():
+    # The panel fetches /api/dashboard every few seconds and is usually not
+    # showing the directory; shipping every client with it would be waste.
+    with demo_client() as client:
+        assert "clients_list" not in client.get("/api/dashboard").json()

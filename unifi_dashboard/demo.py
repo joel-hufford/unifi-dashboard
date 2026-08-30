@@ -22,6 +22,7 @@ _NAMES = [
     "Sonos kitchen", "Workshop laptop", "Guest phone", "NAS", "Roomba",
 ]
 _APS = ["Office AP", "Living room AP", "Shop AP"]
+_VENDORS = ["Apple", "Google", "Espressif", "Sonos", "Ubiquiti", "Intel", "Samsung"]
 _BANDS = ["ng", "na", "na", "6e"]
 
 
@@ -204,8 +205,13 @@ class DemoSource:
                 clients.append(
                     {
                         "mac": f"{_MACS[i % len(_MACS)]}:00:{i:02x}",
-                        "name": _NAMES[i % len(_NAMES)],
+                        "name": f"{_NAMES[i % len(_NAMES)]}",
                         "is_wired": True,
+                        "ip": f"10.0.1.{20 + i}",
+                        "network": "LAN",
+                        "oui": _VENDORS[i % len(_VENDORS)],
+                        "uptime": 3600 * (i + 2),
+                        "sw_name": "Office switch",
                     }
                 )
                 continue
@@ -216,13 +222,21 @@ class DemoSource:
             clients.append(
                 {
                     "mac": f"{_MACS[i % len(_MACS)]}:11:{i:02x}",
-                    "name": _NAMES[i % len(_NAMES)],
+                    "name": (
+                        _NAMES[i % len(_NAMES)]
+                        if i < len(_NAMES)
+                        else f"{_NAMES[i % len(_NAMES)]} {i // len(_NAMES) + 1}"
+                    ),
                     "is_wired": False,
                     "is_guest": i % 13 == 0,
                     "signal": round(signal, 1),
                     "radio": _BANDS[i % len(_BANDS)],
                     "essid": "Home" if i % 13 else "Home Guest",
                     "ap_displayname": _APS[i % len(_APS)],
+                    "ip": f"10.0.{2 if i % 13 else 3}.{20 + i}",
+                    "network": "Home" if i % 13 else "Guest",
+                    "oui": _VENDORS[i % len(_VENDORS)],
+                    "uptime": 600 * (i + 1),
                     "tx_rate": int(self.rng.uniform(120_000, 1_200_000)),
                     "rx_rate": int(self.rng.uniform(120_000, 1_200_000)),
                 }
