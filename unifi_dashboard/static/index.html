@@ -44,6 +44,7 @@
       <div class="hero-head">
         <span class="hero-label" id="hero-label">WAN</span>
         <span class="badge" id="hero-badge" hidden>Cellular</span>
+        <span class="badge badge-warn" id="hero-speed" hidden></span>
       </div>
 
       <p class="hero-state">
@@ -51,9 +52,18 @@
         <span id="hero-state-word">Connecting…</span>
       </p>
 
-      <p class="hero-ip mono" id="hero-ip">—</p>
+      <div class="addresses">
+        <div class="addr">
+          <span class="addr-label">WAN address</span>
+          <span class="addr-value mono" id="hero-ip">—</span>
+        </div>
+        <div class="addr">
+          <span class="addr-label" id="hero-public-label">Public</span>
+          <span class="addr-value mono" id="hero-public">—</span>
+        </div>
+      </div>
 
-      <div class="checks">
+      <div class="checks" id="checks-row">
         <div class="check">
           <span class="lamp" id="check-net-lamp" data-state="unknown" aria-hidden="true"></span>
           <span class="check-name">Internet</span>
@@ -68,6 +78,26 @@
           <span class="lamp" id="check-loss-lamp" data-state="unknown" aria-hidden="true"></span>
           <span class="check-name">Packet loss</span>
           <span class="check-value" id="check-loss-value">—</span>
+        </div>
+      </div>
+
+      <div class="checks" id="radio-row" hidden>
+        <div class="check">
+          <span class="lamp" id="radio-lamp" data-state="unknown" aria-hidden="true"></span>
+          <span class="check-name">Signal</span>
+          <span class="check-value" id="radio-signal">—</span>
+        </div>
+        <div class="check">
+          <span class="check-name">RSRP</span>
+          <span class="check-value" id="radio-rsrp">—</span>
+        </div>
+        <div class="check">
+          <span class="check-name">SINR</span>
+          <span class="check-value" id="radio-sinr">—</span>
+        </div>
+        <div class="check">
+          <span class="check-name">Bands</span>
+          <span class="check-value" id="radio-bands">—</span>
         </div>
       </div>
 

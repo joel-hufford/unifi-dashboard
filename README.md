@@ -71,6 +71,30 @@ without breaking anything:
 python -m unifi_dashboard --demo-fault dns        # or wan-down, loss, latency, failover
 ```
 
+## Two addresses
+
+The WAN card shows both the address the local network assigned (with its
+prefix) and the address the internet sees. On a venue-supplied line - a hotel
+handoff, a conference drop - these answer different questions: what their DHCP
+gave you, and what you are actually presenting outward. When they differ you
+are behind a NAT; when they match you are not, and the card says so.
+
+The public lookup is an outbound request to a third party, so it is throttled
+to once per `interval_minutes` plus an immediate lookup whenever the WAN
+address changes. Set `enabled = false` under `[public_ip]` for a panel that
+makes no external calls. A response that is not a valid IP address - a captive
+portal's sign-in page, say - is rejected rather than displayed.
+
+The card also carries the WAN port's MAC address and its negotiated link speed.
+The MAC is what venue IT asks for when registering a port; the link speed
+appears as a warning badge only when the port negotiated below what it can do
+(`1G of 2.5G`), which is a silent half-capacity fault nothing else reports.
+
+**VLAN is not shown**, deliberately. The controller only knows the tag you
+configure on your own WAN network, not what the venue runs internally - and on
+a typical handoff you are untagged, so there is nothing to report. A field that
+reflects your own configuration back at you is worse than no field.
+
 ## Dual WAN
 
 UniFi gateways expose each uplink separately, so a primary plus a cellular
@@ -80,6 +104,10 @@ standby or down. Tapping one shows that link's detail in the WAN card.
 Slots are discovered rather than assumed: numbering is not contiguous in the
 wild, and a cellular backup commonly reports as `wan3` with no `wan2`. Cellular
 links are recognised from the interface name and labelled as such.
+
+Selecting a cellular link swaps the Internet/DNS/loss row for its radio
+detail - signal percentage, RSRP, SINR and the aggregated bands - which is what
+you would actually check before blaming the backup.
 
 Note that the internet and DNS checks are measured **from the Pi**, so they
 describe whichever link is carrying traffic. Select a standby link and those

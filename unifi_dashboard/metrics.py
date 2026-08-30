@@ -116,7 +116,14 @@ class WanLink:
     cellular: bool = False
     rat: str | None = None                # "5G", "LTE" - cellular links only
     signal_pct: float | None = None
+    rsrp: float | None = None             # dBm, reference signal power
+    sinr: float | None = None             # dB, signal to interference+noise
+    bands: str | None = None              # "n71 + n41"
     ip: str | None = None
+    prefix: int | None = None             # netmask as a CIDR length
+    mac: str | None = None                # venues often want this to register a port
+    speed_mbps: float | None = None       # negotiated
+    max_speed_mbps: float | None = None   # what the port could do
     isp: str | None = None
     uptime_s: float | None = None
     latency_ms: float | None = None
@@ -197,13 +204,48 @@ def is_cellular(iface: dict | None) -> bool:
     return False
 
 
-def cellular_signal(iface: dict | None) -> tuple[str | None, float | None]:
-    """Radio technology and signal percentage from an mbb block, if present."""
+def cellular_signal(iface: dict | None) -> dict:
+    """Radio detail from an mbb block.
+
+    5G-capable modems report both LTE and NR measurements; which set is
+    meaningful depends on what the radio is actually camped on, so the
+    reported access technology picks the family.
+    """
     mbb = (iface or {}).get("mbb")
     if not isinstance(mbb, dict):
-        return None, None
-    rat = mbb.get("rat")
-    return (rat if isinstance(rat, str) else None), _num(mbb.get("signal_pct"))
+        return {}
+    rat = mbb.get("rat") if isinstance(mbb.get("rat"), str) else None
+    nr = bool(rat and "5g" in rat.lower()) and _num(mbb.get("nr_rsrp")) is not None
+    prefix = "nr_" if nr else "lte_"
+    carriers = mbb.get(f"{prefix}ca")
+    bands = None
+    if isinstance(carriers, list) and carriers:
+        letter = "n" if nr else "b"
+        names = [
+            f"{letter}{entry['band']}"
+            for entry in carriers
+            if isinstance(entry, dict) and entry.get("band") is not None
+        ]
+        if names:
+            bands = " + ".join(names)
+    return {
+        "rat": rat,
+        "signal_pct": _num(mbb.get("signal_pct")),
+        "rsrp": _num(mbb.get(f"{prefix}rsrp")),
+        "sinr": _num(mbb.get(f"{prefix}sinr")),
+        "bands": bands,
+    }
+
+
+def prefix_length(netmask: str | None) -> int | None:
+    """A dotted netmask as a CIDR length: what you tell venue IT."""
+    if not isinstance(netmask, str) or not netmask.strip():
+        return None
+    try:
+        import ipaddress
+        return ipaddress.IPv4Network(f"0.0.0.0/{netmask.strip()}").prefixlen
+    except ValueError:
+        return None
 
 
 def wan_links_from(health: list[dict], devices: list[dict]) -> list[WanLink]:
@@ -227,7 +269,7 @@ def wan_links_from(health: list[dict], devices: list[dict]) -> list[WanLink]:
     links: list[WanLink] = []
     for number, key in slots:
         iface = gateway[key]
-        rat, signal_pct = cellular_signal(iface)
+        radio = cellular_signal(iface)
         links.append(
             WanLink(
                 key=key,
@@ -237,9 +279,16 @@ def wan_links_from(health: list[dict], devices: list[dict]) -> list[WanLink]:
                 label=_first_str(iface, "wan_networkgroup") or f"WAN {number}",
                 up=bool(iface.get("up")),
                 cellular=is_cellular(iface),
-                rat=rat,
-                signal_pct=signal_pct,
+                rat=radio.get("rat"),
+                signal_pct=radio.get("signal_pct"),
+                rsrp=radio.get("rsrp"),
+                sinr=radio.get("sinr"),
+                bands=radio.get("bands"),
                 ip=_first_str(iface, "ip"),
+                prefix=prefix_length(_first_str(iface, "netmask")),
+                mac=_first_str(iface, "mac"),
+                speed_mbps=_first_num(iface, "speed"),
+                max_speed_mbps=_first_num(iface, "max_speed"),
                 isp=_first_str(iface, "isp_name", "isp_organization"),
                 uptime_s=_first_num(iface, "uptime"),
                 latency_ms=_first_num(iface, "latency"),

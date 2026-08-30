@@ -214,68 +214,133 @@
     }
   }
 
+  function relativeAge(seconds) {
+    if (seconds == null || !isFinite(seconds)) return null;
+    const age = Date.now() / 1000 - seconds;
+    if (age < 0 || age > 86400 * 30) return null;
+    if (age < 90) return "just now";
+    if (age < 5400) return `${Math.round(age / 60)}m ago`;
+    if (age < 86400) return `${Math.round(age / 3600)}h ago`;
+    return `${Math.round(age / 86400)}d ago`;
+  }
+
+  function signalState(pct) {
+    if (pct == null) return "unknown";
+    if (pct >= 60) return "ok";
+    if (pct >= 30) return "warning";
+    return "critical";
+  }
+
   function renderHero(data) {
     const link = selectedLink(data);
     const wan = data.wan || {};
     const win = data.window || {};
     const dns = data.dns || {};
+    const publicIp = data.public_ip || {};
     const viewingActive = !link || link.active;
 
     $("hero-label").textContent = link ? (link.label || link.key.toUpperCase()) : "WAN";
+
     const badge = $("hero-badge");
     badge.hidden = !(link && link.cellular);
-    // The radio technology is more informative than the word "cellular", and
-    // the gateway reports it.
     badge.textContent = (link && link.rat) || "Cellular";
 
-    const lamp = $("hero-lamp");
-    lamp.dataset.state = LINK_STATE(link);
+    // A port negotiating below what it can do is a fault nothing else reports:
+    // a bad cable or a mismatched switch port, silently halving the link.
+    const speedBadge = $("hero-speed");
+    const negotiated = link && link.speed_mbps;
+    const capable = link && link.max_speed_mbps;
+    const underspeed = negotiated && capable && negotiated < capable;
+    speedBadge.hidden = !underspeed;
+    if (underspeed) speedBadge.textContent = `${gbps(negotiated)} of ${gbps(capable)}`;
+
+    $("hero-lamp").dataset.state = LINK_STATE(link);
     $("hero-state-word").textContent = !link
       ? (wan.online ? "Online" : "Offline")
       : !link.up ? "Offline" : link.active ? "Online" : "Standby";
 
-    $("hero-ip").textContent = (link ? link.ip : wan.ip) || "no address";
+    const address = (link ? link.ip : wan.ip) || null;
+    $("hero-ip").textContent = address
+      ? (link && link.prefix ? `${address}/${link.prefix}` : address)
+      : "no address";
 
-    // The ICMP and DNS probes run from the Pi, so they describe whichever link
-    // is actually carrying traffic - never a standby one. Say so rather than
-    // implying the numbers belong to the link being viewed.
-    const netLamp = $("check-net-lamp");
-    const dnsLamp = $("check-dns-lamp");
-    const lossLamp = $("check-loss-lamp");
+    // The public address describes the path out, which is the active link's.
+    $("hero-public-label").textContent =
+      publicIp.enabled === false ? "Public (off)" : "Public";
+    $("hero-public").textContent = !viewingActive
+      ? "—"
+      : publicIp.address || (publicIp.error ? "unavailable" : "checking…");
 
-    if (!viewingActive) {
-      for (const el of [netLamp, dnsLamp, lossLamp]) el.dataset.state = "idle";
+    // A cellular link's radio detail is more use than probe results it does
+    // not own, so it takes the row.
+    const showRadio = Boolean(link && link.cellular && link.signal_pct != null);
+    $("checks-row").hidden = showRadio;
+    $("radio-row").hidden = !showRadio;
+
+    if (showRadio) {
+      $("radio-lamp").dataset.state = signalState(link.signal_pct);
+      $("radio-signal").textContent = `${Math.round(link.signal_pct)}%`;
+      $("radio-rsrp").textContent = link.rsrp == null ? "—" : `${Math.round(link.rsrp)} dBm`;
+      $("radio-sinr").textContent = link.sinr == null ? "—" : `${link.sinr.toFixed(0)} dB`;
+      $("radio-bands").textContent = link.bands || "—";
+    } else if (!viewingActive) {
+      for (const id of ["check-net-lamp", "check-dns-lamp", "check-loss-lamp"]) {
+        $(id).dataset.state = "idle";
+      }
       $("check-net-value").textContent = "—";
       $("check-dns-value").textContent = "—";
       $("check-loss-value").textContent = "—";
-      $("hero-foot").textContent =
-        [standbyDetail(link), "checks below run over the active WAN"].filter(Boolean).join(" · ");
-      return;
+    } else {
+      $("check-net-lamp").dataset.state =
+        wan.reachable === false ? "critical" : wan.reachable ? "ok" : "unknown";
+      $("check-net-value").textContent =
+        wan.reachable === false ? "no reply" : `${ms(wan.latency_ms)} ms`;
+
+      $("check-dns-lamp").dataset.state = dns.ok === false ? "critical" : dns.ok ? "ok" : "unknown";
+      $("check-dns-value").textContent =
+        dns.ok === false ? "failing" : dns.elapsed_ms == null ? "—" : `${ms(dns.elapsed_ms, 0)} ms`;
+
+      const loss = win.loss_pct;
+      const status = lossStatus(loss);
+      $("check-loss-lamp").dataset.state = status === "good" ? "ok" : status;
+      $("check-loss-value").textContent = loss == null ? "—" : `${loss.toFixed(loss >= 10 ? 0 : 1)}%`;
     }
 
-    netLamp.dataset.state = wan.reachable === false ? "critical" : wan.reachable ? "ok" : "unknown";
-    $("check-net-value").textContent =
-      wan.reachable === false ? "no reply" : `${ms(wan.latency_ms)} ms`;
+    $("hero-foot").textContent = heroFoot(data, link, viewingActive);
+  }
 
-    dnsLamp.dataset.state = dns.ok === false ? "critical" : dns.ok ? "ok" : "unknown";
-    $("check-dns-value").textContent =
-      dns.ok === false ? "failing" : dns.elapsed_ms == null ? "—" : `${ms(dns.elapsed_ms, 0)} ms`;
+  function gbps(mbps) {
+    return mbps >= 1000 ? `${(mbps / 1000).toFixed(mbps % 1000 ? 1 : 0)}G` : `${Math.round(mbps)}M`;
+  }
 
-    const loss = win.loss_pct;
-    lossLamp.dataset.state = lossStatus(loss) === "good" ? "ok" : lossStatus(loss);
-    $("check-loss-value").textContent = loss == null ? "—" : `${loss.toFixed(loss >= 10 ? 0 : 1)}%`;
+  function heroFoot(data, link, viewingActive) {
+    if (!viewingActive) {
+      return [standbyDetail(link), "checks run over the active WAN"].filter(Boolean).join(" · ");
+    }
 
+    const wan = data.wan || {};
     const parts = [`uptime ${duration(link ? link.uptime_s : wan.uptime_s)}`];
     if (link && link.isp) parts.push(link.isp);
-    if (link && link.signal_pct != null) parts.push(`${link.rat || "signal"} ${Math.round(link.signal_pct)}%`);
-    parts.push(`${wan.ping_target || "8.8.8.8"} · ${dns.host || "dns"}`);
-    $("hero-foot").textContent = parts.join(" · ");
+    if (data.public_ip && data.public_ip.behind_nat === false) parts.push("not behind NAT");
+
+    // The controller's own speedtest: a reference line for the graphs, and a
+    // stale timestamp is itself worth knowing.
+    if (wan.speedtest_down_mbps != null) {
+      const age = relativeAge(wan.speedtest_ts);
+      const ping = wan.speedtest_ping_ms == null ? "" : ` · ${ms(wan.speedtest_ping_ms, 0)} ms`;
+      parts.push(
+        `speedtest ${Math.round(wan.speedtest_down_mbps)}↓ ${Math.round(wan.speedtest_up_mbps)}↑ Mbps` +
+          `${ping}${age ? ` · ${age}` : ""}`,
+      );
+    }
+    if (link && link.mac) parts.push(`MAC ${link.mac}`);
+    return parts.join(" · ");
   }
 
   function standbyDetail(link) {
-    const bits = ["Standby link"];
-    if (link && link.signal_pct != null) bits.push(`${link.rat || "signal"} ${Math.round(link.signal_pct)}%`);
-    if (link && link.ip) bits.push(link.ip);
+    const bits = ["Standby"];
+    if (link && link.isp) bits.push(link.isp);
+    if (link && link.uptime_s) bits.push(`up ${duration(link.uptime_s)}`);
     return bits.join(" · ");
   }
 

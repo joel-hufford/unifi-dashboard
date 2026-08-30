@@ -200,3 +200,28 @@ def test_real_payload_flattens_to_the_active_link(ucg_max):
     assert wan.ip == "192.0.2.20"
     assert wan.isp == "Example Broadband"
     assert wan.rx_bps == 2777 and wan.tx_bps == 28390
+
+
+def test_prefix_length_from_netmask():
+    assert metrics.prefix_length("255.255.255.0") == 24
+    assert metrics.prefix_length("255.255.255.224") == 27
+    assert metrics.prefix_length("not a mask") is None
+    assert metrics.prefix_length(None) is None
+
+
+def test_cellular_radio_detail_prefers_the_camped_technology(ucg_max):
+    links = metrics.wan_links_from(ucg_max["health"], [ucg_max["gateway"]])
+    backup = links[1]
+    # The modem reports both LTE and NR figures; camped on 5G, the NR ones are
+    # the meaningful pair (nr_rsrp -83, not lte_rsrp -92).
+    assert backup.rsrp == -83
+    assert backup.sinr == 10
+    assert backup.bands == "n71 + n41"
+
+
+def test_link_speed_exposes_an_underperforming_port(ucg_max):
+    primary = metrics.wan_links_from(ucg_max["health"], [ucg_max["gateway"]])[0]
+    assert primary.speed_mbps == 1000
+    assert primary.max_speed_mbps == 2500      # negotiated below capability
+    assert primary.prefix == 24
+    assert primary.mac

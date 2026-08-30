@@ -12,6 +12,7 @@ import random
 import time
 
 from .dnsprobe import DnsResult
+from .publicip import PublicIp
 from .ping import PingResult
 
 _MACS = ["ac:1f:6b", "78:8a:20", "b4:fb:e4", "f0:9f:c2", "24:5a:4c"]
@@ -67,6 +68,13 @@ class DemoSource:
             rx += self.rng.uniform(2.0e6, 1.0e7)
             tx += self.rng.uniform(1.0e5, 4.0e5)
         return rx, tx
+
+    def public_ip(self, wan_ip: str | None = None) -> PublicIp:
+        if self.fault == "wan-down":
+            return PublicIp(error="lookup failed")
+        # Deliberately different from the WAN address, which is the case the
+        # two-address display exists for.
+        return PublicIp(address="198.51.100.7", checked_at=time.time())
 
     def dns(self, host: str = "cloudflare.com") -> DnsResult:
         if self.fault in ("dns", "wan-down"):
@@ -149,6 +157,10 @@ class DemoSource:
                     "name": "eth4",
                     "type": "ethernet",
                     "media": "2.5GE",
+                    "netmask": "255.255.255.0",
+                    "mac": "aa:bb:cc:00:11:22",
+                    "speed": 1000,
+                    "max_speed": 2500,
                     "ip": "" if (failed_over or wan_down) else primary_ip,
                     "rx_bytes-r": 0 if (failed_over or wan_down) else rx,
                     "tx_bytes-r": 0 if (failed_over or wan_down) else tx,
@@ -163,7 +175,13 @@ class DemoSource:
                     "name": "gre1",
                     "type": "wireless_5g",
                     "mbb_state": "ready",
-                    "mbb": {"rat": "5G", "signal_pct": 78, "lte_rsrp": -92, "nr_rsrp": -83},
+                    "netmask": "255.255.255.224",
+                    "mbb": {
+                        "rat": "5G", "signal_pct": 78,
+                        "lte_rsrp": -92, "lte_sinr": 17.2,
+                        "nr_rsrp": -83, "nr_sinr": 10,
+                        "nr_ca": [{"band": 71, "primary": True}, {"band": 41, "primary": False}],
+                    },
                     "ip": backup_ip if failed_over else "",
                     "rx_bytes-r": rx * 0.2 if failed_over else 0,
                     "tx_bytes-r": tx * 0.2 if failed_over else 0,

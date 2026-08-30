@@ -46,6 +46,21 @@ class PingConfig:
 
 
 @dataclass
+class PublicIpConfig:
+    """Looking up the address the internet sees us as.
+
+    This is an outbound request to a third party. It is throttled to once per
+    interval plus a lookup whenever the WAN address changes, and can be turned
+    off entirely if you would rather the panel make no external calls.
+    """
+
+    enabled: bool = True
+    url: str = "https://api.ipify.org"
+    interval_minutes: float = 15.0
+    timeout: float = 5.0
+
+
+@dataclass
 class ChartConfig:
     # Home and small-office WAN traffic is idle most of the time with rare
     # bursts, so a linear axis scaled to the peak leaves the line flat on the
@@ -116,6 +131,7 @@ class Config:
     dns: DnsConfig = field(default_factory=DnsConfig)
     ui: UiConfig = field(default_factory=UiConfig)
     charts: ChartConfig = field(default_factory=ChartConfig)
+    public_ip: PublicIpConfig = field(default_factory=PublicIpConfig)
     alarm: AlarmConfig = field(default_factory=AlarmConfig)
     server: ServerConfig = field(default_factory=ServerConfig)
     history: HistoryConfig = field(default_factory=HistoryConfig)
@@ -176,6 +192,7 @@ _NESTED = {
     "dns": DnsConfig,
     "ui": UiConfig,
     "charts": ChartConfig,
+    "public_ip": PublicIpConfig,
     "alarm": AlarmConfig,
     "server": ServerConfig,
     "history": HistoryConfig,

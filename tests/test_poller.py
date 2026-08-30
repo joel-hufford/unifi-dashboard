@@ -133,3 +133,15 @@ async def test_a_failed_poll_keeps_the_last_good_snapshot():
     assert poller.snapshot["alarm"]["reasons"] == ["Controller unreachable"]
     # The numbers from the last successful poll are still there to display.
     assert poller.snapshot["wan"]["ip"] == good["wan"]["ip"]
+
+
+@pytest.mark.asyncio
+async def test_public_address_is_reported_alongside_the_wan_address():
+    snapshot = await make_poller().tick()
+    public = snapshot["public_ip"]
+
+    assert public["address"] == "198.51.100.7"
+    # Different from the WAN address, so we are behind a NAT - the fact the
+    # two-address display exists to surface.
+    assert public["behind_nat"] is True
+    assert snapshot["wan"]["ip"] != public["address"]

@@ -64,6 +64,20 @@ latency_ms_critical = 400.0
 # it is something you want to notice the same day. Amber by default.
 failover_is_critical = false
 
+[public_ip]
+# Look up the address the internet sees you as, so the panel can show both the
+# address the local network handed you and what you are presenting outward.
+# The gap between them is the NAT you are sitting behind - which is the thing
+# nobody tells you when you plug into a venue-supplied line.
+#
+# This is an outbound request to a third party. It runs once per interval plus
+# a lookup whenever the WAN address changes; set enabled = false for a panel
+# that makes no external calls at all.
+enabled = true
+url = "https://api.ipify.org"
+interval_minutes = 15.0
+timeout = 5.0
+
 [charts]
 # Small-site WAN traffic is idle most of the time with rare bursts, which a
 # linear axis scaled to the peak renders as a flat line on the baseline.

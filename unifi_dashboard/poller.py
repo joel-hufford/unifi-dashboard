@@ -20,6 +20,7 @@ from .metrics import (
     wlan_quality_from,
 )
 from .ping import PingResult, ping
+from .publicip import PublicIp, PublicIpProbe
 from .storage import History
 
 log = logging.getLogger(__name__)
@@ -40,6 +41,7 @@ class Poller:
         self._prev_counters: tuple[float, float, float] | None = None
         # Keeps the last raw controller payloads for /api/debug/raw.
         self.last_raw: dict[str, list[dict]] = {}
+        self.public_ip = PublicIpProbe(cfg.public_ip)
 
     # -- lifecycle --------------------------------------------------------
 
@@ -124,6 +126,8 @@ class Poller:
         current = active_link(links)
         on_backup = bool(current and current is not links[0] and current.active)
 
+        public = await self._public_ip(current.ip if current else wan.ip)
+
         state = alarm_rules.evaluate(
             self.cfg.alarm,
             controller_ok=True,
@@ -142,6 +146,16 @@ class Poller:
             "generated_at": now,
             "alarm": asdict(state),
             "dns": asdict(dns),
+            "public_ip": {
+                **asdict(public),
+                # A venue-supplied line is almost always NAT'd; knowing whether
+                # you are behind one - and how many - is the point of showing
+                # both addresses at once.
+                "behind_nat": (
+                    None if not public.address or not (current and current.ip)
+                    else public.address != current.ip
+                ),
+            },
             "wan_links": [asdict(link) for link in links],
             "wan": {
                 **asdict(wan),
@@ -171,6 +185,11 @@ class Poller:
         if self.demo is not None:
             return self.demo.ping(self.cfg.ping.count)
         return await ping(self.cfg.ping)
+
+    async def _public_ip(self, wan_ip: str | None) -> PublicIp:
+        if self.demo is not None:
+            return self.demo.public_ip(wan_ip)
+        return await self.public_ip.get(wan_ip)
 
     async def _resolve(self) -> DnsResult:
         if self.demo is not None:

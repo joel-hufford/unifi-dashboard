@@ -305,14 +305,37 @@ body {
   color: var(--text-primary);
 }
 
-.hero-ip {
-  margin: 2px 0 0;
-  font-size: 30px;
+.badge-warn {
+  background: color-mix(in oklab, var(--warning) 26%, var(--surface-1));
+  color: var(--text-primary);
+}
+
+.addresses {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  margin-top: 7px;
+}
+
+.addr { display: flex; flex-direction: column; min-width: 0; }
+
+.addr-label {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.addr-value {
+  font-size: 26px;
   font-weight: 600;
   line-height: 1.15;
   color: var(--text-primary);
   overflow-wrap: anywhere;
 }
+
+.checks[hidden] { display: none; }
 
 .checks {
   display: flex;
@@ -708,9 +731,11 @@ td { color: var(--text-secondary); }
 
   /* This column is the panel's headline: on a bar display it is read from
      across a room, so it gets the size the space allows. */
-  .hero-state { font-size: 46px; gap: 14px; margin-top: 6px; }
-  .hero-state .lamp-lg { width: 28px; height: 28px; }
-  .hero-ip { font-size: 40px; margin-top: 6px; }
+  .hero-state { font-size: 40px; gap: 13px; margin-top: 4px; }
+  .hero-state .lamp-lg { width: 25px; height: 25px; }
+  .addresses { gap: 6px; margin-top: 8px; }
+  .addr-value { font-size: 28px; }
+  .addr-label { font-size: 11px; }
   .hero-label { font-size: 13px; }
   .checks { gap: 16px; padding-top: 9px; }
   .check-name { font-size: 12px; }
