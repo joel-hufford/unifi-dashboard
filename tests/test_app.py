@@ -72,3 +72,11 @@ def test_assets_are_version_stamped_and_never_cached_independently():
 
         asset = client.get("/static/app.js")
         assert "no-cache" in asset.headers["cache-control"]
+
+
+def test_public_ip_can_be_rechecked_on_demand():
+    with demo_client() as client:
+        client.get("/api/dashboard")          # prime a snapshot
+        response = client.post("/api/public-ip/refresh")
+        assert response.status_code == 200
+        assert response.json()["address"] == "198.51.100.7"

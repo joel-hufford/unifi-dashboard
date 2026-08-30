@@ -85,6 +85,14 @@ def create_app(cfg: Config) -> FastAPI:
         # snapshot plus the error, not an exception.
         return JSONResponse(payload)
 
+    @app.post("/api/public-ip/refresh")
+    async def refresh_public_ip():
+        """Force a public-address lookup, for when something changed upstream
+        and waiting out the interval is not useful."""
+        if not cfg.public_ip.enabled:
+            return JSONResponse({"enabled": False, "address": None}, status_code=409)
+        return JSONResponse(await poller.recheck_public_ip())
+
     @app.get("/api/debug/wan")
     async def debug_wan():
         """The gateway's WAN interfaces and the WAN health subsystems, exactly

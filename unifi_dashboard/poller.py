@@ -241,6 +241,25 @@ class Poller:
             "last_success": self.last_success,
         }
 
+    async def recheck_public_ip(self) -> dict:
+        """Force a public-address lookup and fold it into the current snapshot.
+
+        Only the public lookup is throttled - the interface address comes from
+        the controller on every poll - so this is the only thing worth forcing.
+        """
+        self.public_ip.invalidate()
+        wan_ip = (self.snapshot.get("wan") or {}).get("ip")
+        result = await self._public_ip(wan_ip)
+        payload = {
+            **asdict(result),
+            "behind_nat": (
+                None if not result.address or not wan_ip else result.address != wan_ip
+            ),
+        }
+        if self.snapshot.get("ok"):
+            self.snapshot["public_ip"] = payload
+        return payload
+
     # -- API payload ------------------------------------------------------
 
     def dashboard(self, minutes: int) -> dict:

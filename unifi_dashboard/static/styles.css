@@ -335,6 +335,23 @@ body {
   overflow-wrap: anywhere;
 }
 
+.recheck {
+  align-self: flex-start;
+  margin-top: 5px;
+  min-height: 34px;
+  padding: 0 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text-secondary);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.recheck:disabled { opacity: 0.55; cursor: default; }
+.recheck[hidden] { display: none; }
+
 .checks[hidden] { display: none; }
 
 .checks {
@@ -713,7 +730,10 @@ td { color: var(--text-secondary); }
   .banner { padding: 5px 14px; font-size: 13px; }
 
   .layout {
-    grid-template-columns: 352px minmax(0, 1fr) 188px;
+    /* The WAN card carries two addresses, a recheck control and either the
+       probe row or radio detail, so it gets the room. The charts lose ~17% of
+       their width, which costs shape resolution they do not need. */
+    grid-template-columns: 470px minmax(0, 1fr) 188px;
     grid-template-rows: minmax(0, 1fr) minmax(0, 1fr);
     gap: 8px;
     padding: 8px;
@@ -733,8 +753,8 @@ td { color: var(--text-secondary); }
      across a room, so it gets the size the space allows. */
   .hero-state { font-size: 40px; gap: 13px; margin-top: 4px; }
   .hero-state .lamp-lg { width: 25px; height: 25px; }
-  .addresses { gap: 6px; margin-top: 8px; }
-  .addr-value { font-size: 28px; }
+  .addresses { gap: 7px; margin-top: 8px; }
+  .addr-value { font-size: 31px; }
   .addr-label { font-size: 11px; }
   .hero-label { font-size: 13px; }
   .checks { gap: 16px; padding-top: 9px; }

@@ -271,6 +271,11 @@
       ? "—"
       : publicIp.address || (publicIp.error ? "unavailable" : "checking…");
 
+    // Only offer the recheck where it means something: the lookup describes
+    // the active path, and there is nothing to recheck when it is disabled.
+    const recheck = $("public-refresh");
+    recheck.hidden = !viewingActive || publicIp.enabled === false;
+
     // A cellular link's radio detail is more use than probe results it does
     // not own, so it takes the row.
     const showRadio = Boolean(link && link.cellular && link.signal_pct != null);
@@ -930,6 +935,24 @@
         refresh();
       });
     }
+
+    $("public-refresh").addEventListener("click", async (event) => {
+      const button = event.currentTarget;
+      const original = button.textContent;
+      button.disabled = true;
+      button.textContent = "Checking…";
+      try {
+        const response = await fetch("/api/public-ip/refresh", { method: "POST" });
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        await refresh();
+      } catch (error) {
+        console.error("public IP recheck failed", error);
+        showBanner("warning", `Public address recheck failed: ${error.message}`);
+      } finally {
+        button.disabled = false;
+        button.textContent = original;
+      }
+    });
 
     $("theme-toggle").addEventListener("click", () => {
       setTheme(document.documentElement.dataset.theme === "dark" ? "light" : "dark");

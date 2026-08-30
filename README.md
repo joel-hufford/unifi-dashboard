@@ -79,6 +79,11 @@ handoff, a conference drop - these answer different questions: what their DHCP
 gave you, and what you are actually presenting outward. When they differ you
 are behind a NAT; when they match you are not, and the card says so.
 
+A **Recheck now** button under the public address forces a lookup immediately,
+for when something changed upstream and waiting out the interval is not useful.
+Only the public address is throttled - the interface address comes from the
+controller on every poll - so that is the only thing the button forces.
+
 The public lookup is an outbound request to a third party, so it is throttled
 to once per `interval_minutes` plus an immediate lookup whenever the WAN
 address changes. Set `enabled = false` under `[public_ip]` for a panel that
@@ -124,7 +129,7 @@ The page has three layouts, chosen by viewport rather than by configuration:
 | Viewport | Layout |
 |---|---|
 | Landscape, taller than 460px | Top bar, a row of four stat tiles, then charts beside the Wi-Fi card. |
-| **Landscape, 460px or shorter** (bar displays like 1280x400) | Three columns: latency and packet loss at the left, charts in the middle, devices and Wi-Fi quality at the right. The Wi-Fi detail card is dropped and its device-health line folds into the devices tile. |
+| **Landscape, 460px or shorter** (bar displays like 1280x400) | Three columns: the WAN card at the left, charts in the middle, devices and Wi-Fi quality at the right. The WAN card takes the largest share, since it is what the panel exists to show; the Wi-Fi detail card is dropped and its device-health line folds into the devices tile. |
 | Portrait (the Touch Display 2's native orientation) | One column: tiles two-up, then charts, then the Wi-Fi card. |
 
 Verified at 1280x400, 1024x600, 1280x720 and 720x1280, in both palettes. On a

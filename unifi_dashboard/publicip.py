@@ -40,6 +40,15 @@ class PublicIpProbe:
         self._last_wan_ip: str | None = None
         self._last_attempt: float = 0.0
 
+    def invalidate(self) -> None:
+        """Drop the throttle so the next lookup actually goes out.
+
+        For the on-screen recheck: when something changed upstream you want the
+        answer now, not at the end of the interval.
+        """
+        self._last_attempt = 0.0
+        self._last_wan_ip = None
+
     def _due(self, wan_ip: str | None, now: float) -> bool:
         if not self.cfg.enabled:
             return False
