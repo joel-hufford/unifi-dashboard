@@ -338,6 +338,9 @@ python -m unifi_dashboard --demo
 - Wi-Fi quality uses the controller's own satisfaction score where it exists
   and a signal-strength score where it does not, so the number is comparable
   between clients but is not a UniFi-official metric.
-- SD cards do not enjoy constant writes. The history database is small and
-  WAL-mode, but an SSD or USB boot drive is kinder if you plan to leave this
-  running for years.
+- The history database writes about 34 MiB a day (~12 GiB a year), which is
+  well within any reputable SD card's endurance - measured, not assumed. If you
+  would rather keep it off the card anyway, or want the history to survive a
+  card failure, [docs/storage.md](docs/storage.md) covers moving it to a USB
+  drive, and notes the two things that genuinely do wear a Pi's card faster
+  than this does.

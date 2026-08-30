@@ -272,7 +272,7 @@ body {
   min-height: 0;
 }
 
-.hero-head { display: flex; align-items: center; gap: 9px; }
+.hero-head { display: flex; align-items: center; gap: 9px; min-height: 34px; }
 
 .hero-label {
   font-size: 12px;
@@ -335,9 +335,10 @@ body {
   overflow-wrap: anywhere;
 }
 
+/* Top right of the card: out of the addresses' way, so they get the size. */
 .recheck {
-  align-self: flex-start;
-  margin-top: 5px;
+  margin-left: auto;
+  align-self: center;
   min-height: 34px;
   padding: 0 12px;
   border: 1px solid var(--border);
@@ -854,8 +855,11 @@ td { color: var(--text-secondary); }
      across a room, so it gets the size the space allows. */
   .hero-state { font-size: 40px; gap: 13px; margin-top: 4px; }
   .hero-state .lamp-lg { width: 25px; height: 25px; }
-  .addresses { gap: 7px; margin-top: 8px; }
-  .addr-value { font-size: 31px; }
+  .addresses { gap: 9px; margin-top: 9px; }
+  /* Measured: a worst-case "255.255.255.255/24" needs 412px at this size in a
+     448px card, so it stays on one line with room to spare. 40px also fits but
+     only by 14px, which is too little to trust across font stacks. */
+  .addr-value { font-size: 38px; }
   .addr-label { font-size: 11px; }
   .hero-label { font-size: 13px; }
   .checks { gap: 16px; padding-top: 9px; }

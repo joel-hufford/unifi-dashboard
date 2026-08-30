@@ -1,0 +1,20 @@
+# /etc/systemd/system/unifi-dashboard.service.d/storage.conf
+#
+# Lets the service write its history database to a mounted drive instead of
+# the SD card. A drop-in rather than an edit to the unit itself, so re-running
+# deploy/install.sh (which rewrites the unit) does not undo it.
+#
+#   sudo mkdir -p /etc/systemd/system/unifi-dashboard.service.d
+#   sudo cp deploy/usb-storage.conf.example \
+#           /etc/systemd/system/unifi-dashboard.service.d/storage.conf
+#   sudo systemctl daemon-reload && sudo systemctl restart unifi-dashboard
+#
+# See docs/storage.md for the whole procedure.
+
+[Service]
+# The unit sets ProtectSystem=strict, so anywhere outside its StateDirectory is
+# read-only unless named here.
+ReadWritePaths=/mnt/unifi-data
+# Wait for the mount, and fail loudly if it is not there - far better than
+# silently writing to the SD card you were trying to spare.
+RequiresMountsFor=/mnt/unifi-data
