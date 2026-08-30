@@ -79,7 +79,7 @@ handoff, a conference drop - these answer different questions: what their DHCP
 gave you, and what you are actually presenting outward. When they differ you
 are behind a NAT; when they match you are not, and the card says so.
 
-A **Recheck now** button under the public address forces a lookup immediately,
+A **Refresh** button under the public address forces a lookup immediately,
 for when something changed upstream and waiting out the interval is not useful.
 Only the public address is throttled - the interface address comes from the
 controller on every poll - so that is the only thing the button forces.
