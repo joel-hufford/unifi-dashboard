@@ -40,6 +40,9 @@ class DemoSource:
         self.tx_level = 4e5
         self.client_count = 42
         self.fault = fault if fault in self.FAULTS else "none"
+        self.speedtest_ts = time.time() - 5400
+        self.speedtest_until: float | None = None
+        self.speedtest_result = (934.2, 41.6, 11.4)
 
     # -- shaping ----------------------------------------------------------
 
@@ -69,6 +72,30 @@ class DemoSource:
             rx += self.rng.uniform(2.0e6, 1.0e7)
             tx += self.rng.uniform(1.0e5, 4.0e5)
         return rx, tx
+
+    def start_speedtest(self) -> None:
+        """Pretend the gateway is testing, for about eight seconds."""
+        self.speedtest_until = time.time() + 8.0
+
+    def _speedtest_fields(self) -> dict:
+        now = time.time()
+        running = self.speedtest_until is not None and now < self.speedtest_until
+        if self.speedtest_until is not None and not running:
+            self.speedtest_until = None
+            self.speedtest_ts = now
+            self.speedtest_result = (
+                round(self.rng.uniform(280, 950), 1),
+                round(self.rng.uniform(30, 300), 1),
+                round(self.rng.uniform(4, 22), 1),
+            )
+        down, up, ping = self.speedtest_result
+        return {
+            "speedtest_status": "Running" if running else "Success",
+            "speedtest_lastrun": self.speedtest_ts,
+            "xput_down": down,
+            "xput_up": up,
+            "speedtest_ping": ping,
+        }
 
     def public_ip(self, wan_ip: str | None = None) -> PublicIp:
         if self.fault == "wan-down":
@@ -133,10 +160,7 @@ class DemoSource:
                 "status": "ok",
                 "latency": round(11 + self.rng.uniform(-2, 4), 1),
                 "uptime": uptime,
-                "xput_down": 934.2,
-                "xput_up": 41.6,
-                "speedtest_ping": 11.4,
-                "speedtest_lastrun": time.time() - 5400,
+                **self._speedtest_fields(),
                 "isp_name": "Example Fiber",
             },
             {"subsystem": "lan", "status": "ok", "num_user": 11, "num_guest": 0, "num_adopted": 4},

@@ -145,3 +145,64 @@ async def test_public_address_is_reported_alongside_the_wan_address():
     # two-address display exists to surface.
     assert public["behind_nat"] is True
     assert snapshot["wan"]["ip"] != public["address"]
+
+
+@pytest.mark.asyncio
+async def test_speedtest_reports_idle_before_one_is_asked_for():
+    snapshot = await make_poller().tick()
+    test = snapshot["speedtest"]
+    assert test["running"] is False and test["finished"] is False
+    assert test["down_mbps"] is not None      # the gateway's previous result
+
+
+@pytest.mark.asyncio
+async def test_speedtest_runs_then_publishes_a_fresh_result():
+    poller = make_poller()
+    await poller.tick()
+    before = poller.snapshot["wan"]["speedtest_ts"]
+
+    started = await poller.start_speedtest()
+    assert started["running"] is True
+
+    # Still pending: the gateway has not published anything newer yet.
+    during = (await poller.tick())["speedtest"]
+    assert during["running"] is True and during["finished"] is False
+
+    # The demo finishes after eight seconds; jump the clock instead of waiting.
+    poller.demo.speedtest_until = 0.0
+    after = (await poller.tick())["speedtest"]
+    assert after["running"] is False
+    assert after["finished"] is True
+    assert after["ts"] > before               # completion is the timestamp moving
+
+
+@pytest.mark.asyncio
+async def test_a_speedtest_that_never_reports_times_out_rather_than_spinning():
+    import unifi_dashboard.poller as poller_module
+
+    poller = make_poller()
+    await poller.tick()
+    await poller.start_speedtest()
+    # Pretend the request was made longer ago than we are willing to wait.
+    poller._speedtest["requested_at"] -= poller_module.SPEEDTEST_TIMEOUT_S + 1
+
+    state = (await poller.tick())["speedtest"]
+    assert state["running"] is False
+    assert state["timed_out"] is True
+
+
+@pytest.mark.asyncio
+async def test_a_refused_speedtest_records_the_reason_and_does_not_look_pending():
+    poller = make_poller()
+    await poller.tick()
+
+    def refuse():
+        raise RuntimeError("controller refused the command")
+
+    poller.demo.start_speedtest = refuse
+    with pytest.raises(RuntimeError):
+        await poller.start_speedtest()
+
+    state = (await poller.tick())["speedtest"]
+    assert state["running"] is False
+    assert "refused" in state["error"]

@@ -98,3 +98,12 @@ def test_client_directory_is_not_in_the_polling_payload():
     # showing the directory; shipping every client with it would be waste.
     with demo_client() as client:
         assert "clients_list" not in client.get("/api/dashboard").json()
+
+
+def test_speedtest_can_be_started_from_the_panel():
+    with demo_client() as client:
+        client.get("/api/dashboard")
+        response = client.post("/api/speedtest")
+        assert response.status_code == 200
+        assert response.json()["running"] is True
+        assert client.get("/api/dashboard").json()["speedtest"]["running"] is True

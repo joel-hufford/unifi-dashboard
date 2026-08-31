@@ -6,12 +6,14 @@
 
   const SVG_NS = "http://www.w3.org/2000/svg";
   const REFRESH_FLOOR_MS = 4000;
+  const SPEEDTEST_POLL_MS = 2000;
   const PAD = { top: 16, right: 10, bottom: 4, left: 8 };
   const AXIS_BAND = 18;
 
   const state = {
     minutes: 60,
     selectedWan: null,      // null = follow whichever link is active
+    view: "charts",         // "charts" | "speedtest"
     data: null,
     geometry: new Map(),   // panel id -> { x(i), y(v), plot box, count }
     hoverIndex: null,
@@ -111,10 +113,18 @@
     }
   }
 
+  // Self-rescheduling rather than a fixed interval, so a running speed test
+  // can be watched at a useful cadence without polling that fast all day.
   function scheduleRefresh() {
-    clearInterval(state.timer);
-    const interval = Math.max(REFRESH_FLOOR_MS, (state.data?.poll_interval || 10) * 1000);
-    state.timer = setInterval(refresh, interval);
+    clearTimeout(state.timer);
+    const running = state.data?.speedtest?.running;
+    const interval = running
+      ? SPEEDTEST_POLL_MS
+      : Math.max(REFRESH_FLOOR_MS, (state.data?.poll_interval || 10) * 1000);
+    state.timer = setTimeout(async () => {
+      await refresh();
+      scheduleRefresh();
+    }, interval);
   }
 
   /* ---------------------------------------------------------------- render */
@@ -127,6 +137,7 @@
     renderHero(data);
     renderKpis(data);
     renderCharts(data);
+    renderSpeedtest(data);
     renderWlan(data);
     if ($("table-toggle").getAttribute("aria-expanded") === "true") renderTable(data);
   }
@@ -456,6 +467,59 @@
       loss: series.loss_pct,
       axis: true,
     });
+  }
+
+  function setView(view) {
+    state.view = view;
+    const speedtest = view === "speedtest";
+    $("panels").hidden = speedtest;
+    $("speedtest-view").hidden = !speedtest;
+    $("speedtest-back").hidden = !speedtest;
+    $("table-toggle").hidden = speedtest;
+    $("card-hero").hidden = speedtest;      // one hero figure per view
+    $("card-title").textContent = speedtest ? "Speed test" : "WAN throughput";
+
+    if (!speedtest) {
+      $("table-wrap").hidden = true;
+      $("table-toggle").setAttribute("aria-expanded", "false");
+      $("table-toggle").textContent = "Table";
+      if (state.data) renderCharts(state.data);
+    } else if (state.data) {
+      renderSpeedtest(state.data);
+    }
+  }
+
+  function renderSpeedtest(data) {
+    if (state.view !== "speedtest") return;
+    const test = data.speedtest || {};
+    const view = $("speedtest-view");
+    view.classList.toggle("st-running", Boolean(test.running));
+
+    const figure = (value, digits = 0) =>
+      value == null ? "—" : value.toFixed(value < 10 ? 1 : digits);
+    $("st-down").textContent = figure(test.down_mbps);
+    $("st-up").textContent = figure(test.up_mbps);
+    $("st-ping").textContent = figure(test.ping_ms, 1);
+
+    const start = $("speedtest-start");
+    start.disabled = Boolean(test.running);
+    start.textContent = test.running ? "Testing…" : "Speed test";
+
+    if (test.error) {
+      $("st-note").textContent = `Could not start: ${test.error}`;
+    } else if (test.running) {
+      const elapsed = test.elapsed_s == null ? "" : ` · ${Math.round(test.elapsed_s)}s elapsed`;
+      $("st-note").textContent =
+        `Running on the gateway - usually about 30 seconds${elapsed}. The figures below are the previous run.`;
+    } else if (test.timed_out) {
+      $("st-note").textContent =
+        "The gateway did not report a result. The figures below are the previous run.";
+    } else {
+      const age = relativeAge(test.ts);
+      $("st-note").textContent = age
+        ? `Measured by the gateway ${age}${test.status ? ` · ${test.status}` : ""}`
+        : "No result yet - press Speed test to run one.";
+    }
   }
 
   const windowLabel = (minutes) =>
@@ -1054,6 +1118,29 @@
         refresh();
       });
     }
+
+    $("speedtest-start").addEventListener("click", async (event) => {
+      const button = event.currentTarget;
+      button.disabled = true;
+      button.textContent = "Starting…";
+      setView("speedtest");
+      try {
+        const response = await fetch("/api/speedtest", { method: "POST" });
+        const payload = await response.json().catch(() => ({}));
+        if (!response.ok) throw new Error(payload.error || `HTTP ${response.status}`);
+        await refresh();
+        scheduleRefresh();          // pick up the faster cadence immediately
+      } catch (error) {
+        console.error("speed test failed to start", error);
+        // The controller refuses this for a read-only key, which is worth
+        // saying out loud rather than leaving a button that does nothing.
+        $("st-note").textContent = `Could not start: ${error.message}`;
+        button.disabled = false;
+        button.textContent = "Speed test";
+      }
+    });
+
+    $("speedtest-back").addEventListener("click", () => setView("charts"));
 
     $("clients-open").addEventListener("click", openClients);
     $("clients-close").addEventListener("click", closeClients);

@@ -103,6 +103,14 @@ def create_app(cfg: Config) -> FastAPI:
             "clients": [asdict(entry) for entry in entries],
         })
 
+    @app.post("/api/speedtest")
+    async def start_speedtest():
+        """Start a gateway speed test. The only write this dashboard makes."""
+        try:
+            return JSONResponse(await poller.start_speedtest())
+        except Exception as exc:
+            return JSONResponse({"running": False, "error": str(exc)}, status_code=502)
+
     @app.post("/api/public-ip/refresh")
     async def refresh_public_ip():
         """Force a public-address lookup, for when something changed upstream

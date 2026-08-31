@@ -102,6 +102,7 @@ class WanStatus:
     speedtest_up_mbps: float | None = None
     speedtest_ping_ms: float | None = None
     speedtest_ts: float | None = None
+    speedtest_status: str | None = None
 
 
 @dataclass
@@ -395,6 +396,7 @@ def wan_from(health: list[dict], devices: list[dict]) -> WanStatus:
     status.speedtest_up_mbps = _first_num(www, "xput_up")
     status.speedtest_ping_ms = _first_num(www, "speedtest_ping")
     status.speedtest_ts = _first_num(www, "speedtest_lastrun")
+    status.speedtest_status = _first_str(www, "speedtest_status")
     return status
 
 

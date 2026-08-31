@@ -88,3 +88,26 @@ async def test_disabled_probe_makes_no_request():
     assert result.enabled is False
     assert result.address is None
     assert calls == []
+
+
+# --- the one write the dashboard makes -------------------------------------
+
+@pytest.mark.asyncio
+async def test_a_read_only_credential_gets_an_explanatory_refusal():
+    from unifi_dashboard.config import UniFiConfig
+    from unifi_dashboard.unifi_client import UniFiAuthError, UniFiClient
+
+    client = UniFiClient(UniFiConfig(api_key="k"))
+    client._prefix = "/proxy/network"
+    client._authenticated = True
+    client._http = httpx.AsyncClient(
+        base_url="https://192.0.2.1",
+        transport=httpx.MockTransport(lambda request: httpx.Response(403, text="forbidden")),
+    )
+
+    with pytest.raises(UniFiAuthError) as caught:
+        await client.start_speedtest()
+    # Starting a test is the only write, so a read-only key fails here alone -
+    # the message has to say that rather than "auth failed".
+    assert "read-only" in str(caught.value)
+    await client.aclose()

@@ -49,6 +49,21 @@ Set `throughput_scale = "linear"` under `[charts]` if your link is busy enough
 that magnitude comparison matters more. Latency is always linear - its range is
 naturally narrow, and log latency reads badly.
 
+## Speed test
+
+A **Speed test** button in the WAN card asks the gateway to run its built-in
+test. The throughput chart is replaced by the result - download, upload and
+latency - with **Back to chart** to return.
+
+The gateway runs the test itself over roughly half a minute and publishes the
+outcome in its health data, so completion is detected by the result's timestamp
+moving past the one recorded when the test was requested, rather than by
+holding a request open. While a test is pending the controller is polled every
+3 seconds instead of the usual interval, so the result appears when it lands.
+
+Previous figures stay on screen while a test runs, labelled as such - a blank
+panel would be less useful than a stale one you know is stale.
+
 ## The client directory
 
 The **Connected devices** tile is a button. Tapping it opens a full-screen
@@ -228,7 +243,11 @@ Two ways in, in order of preference:
 Consoles ship a self-signed certificate, so `verify_ssl` is `false` by default.
 Point it at the console's certificate file to turn verification on.
 
-The dashboard only ever issues GETs.
+Every read is a GET. The **one** write the dashboard makes is starting a speed
+test, which is `POST .../cmd/devmgr` - so if you want that button to work, the
+API key or admin account needs more than read-only access. Everything else on
+the panel works fine with a read-only credential, and a refusal there says so
+explicitly rather than failing generically.
 
 ### Kiosk browser
 

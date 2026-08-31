@@ -25,6 +25,13 @@ from .storage import History
 
 log = logging.getLogger(__name__)
 
+# A gateway speed test takes roughly half a minute; past this we stop claiming
+# it is still running rather than spinning forever.
+SPEEDTEST_TIMEOUT_S = 150.0
+# While a test is pending the controller is polled faster, so the result is
+# seen when it lands rather than up to a full interval later.
+SPEEDTEST_POLL_S = 3.0
+
 
 class Poller:
     def __init__(self, cfg: Config, store: History, client=None) -> None:
@@ -42,6 +49,11 @@ class Poller:
         # Keeps the last raw controller payloads for /api/debug/raw.
         self.last_raw: dict[str, list[dict]] = {}
         self.public_ip = PublicIpProbe(cfg.public_ip)
+        # A speed test is fire-and-forget: the gateway publishes the result in
+        # the www health subsystem, so completion is detected by the timestamp
+        # moving past the one recorded when it was asked for.
+        self._speedtest = {"requested_at": None, "baseline_ts": None, "error": None}
+        self._last_wan = None
 
     # -- lifecycle --------------------------------------------------------
 
@@ -75,7 +87,10 @@ class Poller:
             except Exception as exc:  # a poll failure must never kill the loop
                 log.warning("poll failed: %s", exc)
                 self._record_failure(str(exc))
-            delay = max(1.0, self.cfg.poll_interval - (time.monotonic() - started))
+            interval = self.cfg.poll_interval
+            if self._speedtest_pending():
+                interval = min(interval, SPEEDTEST_POLL_S)
+            delay = max(1.0, interval - (time.monotonic() - started))
             try:
                 await asyncio.wait_for(self._stopping.wait(), timeout=delay)
             except asyncio.TimeoutError:
@@ -123,6 +138,7 @@ class Poller:
             }
         )
 
+        self._last_wan = wan
         current = active_link(links)
         on_backup = bool(current and current is not links[0] and current.active)
 
@@ -146,6 +162,7 @@ class Poller:
             "generated_at": now,
             "alarm": asdict(state),
             "dns": asdict(dns),
+            "speedtest": self._speedtest_state(wan),
             "public_ip": {
                 **asdict(public),
                 # A venue-supplied line is almost always NAT'd; knowing whether
@@ -241,6 +258,61 @@ class Poller:
             "last_success": self.last_success,
         }
 
+    def _speedtest_pending(self) -> bool:
+        requested = self._speedtest["requested_at"]
+        if not requested or self._last_wan is None:
+            return bool(requested)
+        state = self._speedtest_state(self._last_wan)
+        return bool(state["running"])
+
+    def _speedtest_state(self, wan) -> dict:
+        requested = self._speedtest["requested_at"]
+        baseline = self._speedtest["baseline_ts"]
+        finished = bool(
+            requested and wan.speedtest_ts and (baseline is None or wan.speedtest_ts > baseline)
+        )
+        elapsed = (time.time() - requested) if requested else None
+        running = bool(requested and not finished and elapsed < SPEEDTEST_TIMEOUT_S)
+        return {
+            "running": running,
+            "finished": finished,
+            "timed_out": bool(requested and not finished and not running),
+            "requested_at": requested,
+            "elapsed_s": round(elapsed, 1) if elapsed is not None else None,
+            "status": wan.speedtest_status,
+            "down_mbps": wan.speedtest_down_mbps,
+            "up_mbps": wan.speedtest_up_mbps,
+            "ping_ms": wan.speedtest_ping_ms,
+            "ts": wan.speedtest_ts,
+            "error": self._speedtest["error"],
+        }
+
+    async def start_speedtest(self) -> dict:
+        """Ask the gateway to run a speed test.
+
+        The only write this dashboard makes. The result arrives through the
+        normal poll, so this returns immediately with the pending state.
+        """
+        wan = self.snapshot.get("wan") or {}
+        self._speedtest = {
+            "requested_at": time.time(),
+            "baseline_ts": wan.get("speedtest_ts"),
+            "error": None,
+        }
+        try:
+            if self.demo is not None:
+                self.demo.start_speedtest()
+            elif self.client is not None:
+                await self.client.start_speedtest()
+            else:
+                raise RuntimeError("no UniFi client configured")
+        except Exception as exc:
+            log.warning("speed test could not be started: %s", exc)
+            self._speedtest = {"requested_at": None, "baseline_ts": None, "error": str(exc)}
+            raise
+        return {**(self.snapshot.get("speedtest") or {}), "running": True, "error": None,
+                "requested_at": self._speedtest["requested_at"], "finished": False}
+
     async def recheck_public_ip(self) -> dict:
         """Force a public-address lookup and fold it into the current snapshot.
 
@@ -267,6 +339,11 @@ class Poller:
         summary = self.store.summary(minutes)
         now = time.time()
         snapshot = dict(self.snapshot)
+        # Recomputed per request rather than per poll: "running" and the
+        # elapsed count are derived from the clock, and a caller watching a
+        # speed test should not see them lag a whole poll interval behind.
+        if self._last_wan is not None:
+            snapshot["speedtest"] = self._speedtest_state(self._last_wan)
         snapshot["stale_s"] = round(now - self.last_success, 1) if self.last_success else None
         snapshot["poll_interval"] = self.cfg.poll_interval
         snapshot["window"] = summary

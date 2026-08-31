@@ -46,6 +46,7 @@
         <span class="badge" id="hero-badge" hidden>Cellular</span>
         <span class="badge badge-warn" id="hero-speed" hidden></span>
         <button type="button" class="recheck" id="public-refresh">Refresh</button>
+        <button type="button" class="recheck recheck-primary" id="speedtest-start">Speed test</button>
       </div>
 
       <p class="hero-state">
@@ -129,14 +130,15 @@
     <section class="card charts" aria-label="WAN throughput and latency">
       <div class="card-head">
         <div>
-          <h2 class="card-title">WAN throughput</h2>
+          <h2 class="card-title" id="card-title">WAN throughput</h2>
           <p class="card-sub" id="charts-sub">last hour</p>
         </div>
-        <div class="hero">
+        <div class="hero" id="card-hero">
           <span class="hero-figure" id="hero-down">—</span>
           <span class="hero-unit">Mbps down now</span>
         </div>
         <button type="button" class="ghost-button" id="table-toggle" aria-expanded="false">Table</button>
+        <button type="button" class="ghost-button" id="speedtest-back" hidden>Back to chart</button>
       </div>
 
       <div class="panels" id="panels">
@@ -165,6 +167,27 @@
         </figure>
 
         <div class="tooltip" id="tooltip" hidden></div>
+      </div>
+
+      <div class="speedtest" id="speedtest-view" hidden>
+        <div class="st-figures">
+          <div class="st-fig">
+            <span class="st-label">Download</span>
+            <span class="st-value" id="st-down">—</span>
+            <span class="st-unit">Mbps</span>
+          </div>
+          <div class="st-fig">
+            <span class="st-label">Upload</span>
+            <span class="st-value" id="st-up">—</span>
+            <span class="st-unit">Mbps</span>
+          </div>
+          <div class="st-fig">
+            <span class="st-label">Latency</span>
+            <span class="st-value" id="st-ping">—</span>
+            <span class="st-unit">ms</span>
+          </div>
+        </div>
+        <p class="st-note" id="st-note">—</p>
       </div>
 
       <div class="table-wrap" id="table-wrap" hidden>

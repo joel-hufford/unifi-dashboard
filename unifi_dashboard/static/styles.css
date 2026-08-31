@@ -351,6 +351,10 @@ body {
   cursor: pointer;
 }
 .recheck:disabled { opacity: 0.55; cursor: default; }
+.recheck-primary {
+  background: var(--ghost);
+  color: var(--text-primary);
+}
 .recheck[hidden] { display: none; }
 
 .checks[hidden] { display: none; }
@@ -475,6 +479,41 @@ body {
   color: var(--text-muted);
 }
 
+/* Speed test result -------------------------------------------------------- */
+
+.speedtest[hidden] { display: none; }
+
+.speedtest {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 10px;
+}
+
+.st-figures { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; }
+
+.st-fig {
+  display: flex;
+  flex-direction: column;
+  align-items: baseline;
+  gap: 2px;
+}
+
+.st-label {
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+.st-value { font-size: 54px; font-weight: 600; line-height: 1.05; color: var(--text-primary); }
+.st-unit { font-size: 13px; color: var(--text-secondary); }
+.st-note { margin: 0; font-size: 13px; color: var(--text-muted); }
+
+.st-running .st-value { opacity: 0.45; }
+
 /* Client directory --------------------------------------------------------- */
 
 .overlay[hidden] { display: none; }
@@ -569,6 +608,9 @@ body {
 }
 .card-title { margin: 0; font-size: 15px; font-weight: 600; color: var(--text-primary); }
 .card-sub   { margin: 1px 0 0; font-size: 12px; color: var(--text-muted); }
+
+/* A display rule beats the hidden attribute, so it needs saying explicitly. */
+.hero[hidden], .ghost-button[hidden] { display: none; }
 
 .hero {
   margin-left: auto;
@@ -886,6 +928,11 @@ td { color: var(--text-secondary); }
   .hero-figure { font-size: 30px; }
   .hero-unit { font-size: 10px; margin-top: 0; }
   .ghost-button { min-height: 30px; padding: 0 11px; font-size: 13px; }
+  /* The two card controls are the panel's only actions, so they get real
+     thumb-sized targets rather than the minimum that fits. */
+  .recheck { min-height: 44px; padding: 0 16px; font-size: 15px; }
+  .hero-head { gap: 8px; min-height: 44px; }
+  .st-value { font-size: 62px; }
 
   .panels { gap: 2px; }
   .panel-title, .panel-stats { font-size: 11px; }

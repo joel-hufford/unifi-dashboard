@@ -149,6 +149,48 @@ class UniFiClient:
         """Currently connected clients, wired and wireless."""
         return await self._request("/stat/sta")
 
+    async def _command(self, endpoint: str, payload: dict, *, retry: bool = True) -> list[dict]:
+        """POST to a controller command endpoint.
+
+        This is the only write the dashboard makes. A read-only admin or API
+        key will be refused here and nowhere else, so the error says so
+        plainly rather than surfacing as a generic failure.
+        """
+        if not self._authenticated:
+            await self._login()
+        prefix = await self._detect_prefix()
+        url = f"{prefix}/api/s/{self.cfg.site}{endpoint}"
+        try:
+            resp = await self._http.post(url, json=payload)
+        except httpx.HTTPError as exc:
+            raise UniFiError(f"command {endpoint} failed: {exc}") from exc
+
+        if resp.status_code in (401, 403):
+            if self.cfg.auth_mode == "local_admin" and retry:
+                self._authenticated = False
+                return await self._command(endpoint, payload, retry=False)
+            raise UniFiAuthError(
+                "the controller refused the command. Starting a speed test is a write, "
+                "so the API key or admin account needs more than read-only access."
+            )
+        if resp.status_code >= 400:
+            raise UniFiError(f"{endpoint} returned HTTP {resp.status_code}")
+
+        try:
+            body = resp.json()
+        except ValueError:
+            return []
+        return body.get("data", []) if isinstance(body, dict) else []
+
+    async def start_speedtest(self) -> None:
+        """Ask the gateway to run its built-in speed test.
+
+        Results are not returned here - the gateway runs the test over about
+        half a minute and publishes the outcome in the www health subsystem,
+        which the normal poll already reads.
+        """
+        await self._command("/cmd/devmgr", {"cmd": "speedtest"})
+
     async def fetch_all(self) -> dict[str, list[dict]]:
         """One poll's worth of data. Sequential on purpose: the console is a
         small appliance and three concurrent requests is how you make it
