@@ -142,6 +142,14 @@ Slots are discovered rather than assumed: numbering is not contiguous in the
 wild, and a cellular backup commonly reports as `wan3` with no `wan2`. Cellular
 links are recognised from the interface name and labelled as such.
 
+**A link reporting `up` is not a link carrying traffic.** A UniFi cellular
+backup is a GRE tunnel and reports up whenever the interface exists, so during
+a total outage it will still say so. Only the link the controller names as
+holding the WAN address is shown active; when the controller reports the WAN
+down, *nothing* is marked active, because that is the state the network is
+actually in. A link that is up but holds no address is flagged rather than
+shown as a healthy standby - it cannot take over in that condition.
+
 Selecting a cellular link swaps the Internet/DNS/loss row for its radio
 detail - signal percentage, RSRP, SINR and the aggregated bands - which is what
 you would actually check before blaming the backup.

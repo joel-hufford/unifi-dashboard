@@ -273,3 +273,37 @@ def test_unnamed_clients_fall_back_to_vendor_then_mac():
     ])}
     assert rows["aa:bb:cc:00:00:09"].name == "Espressif"
     assert rows["aa:bb:cc:00:00:0a"].name == "aa:bb:cc:00:00:0a"
+
+
+def test_nothing_is_active_when_the_controller_reports_the_wan_down():
+    # Reported from hardware: with both uplinks disconnected the cellular link
+    # still showed green. It is a GRE tunnel, so it reports up whenever the
+    # interface exists - guessing the active link from `up` alone lit it during
+    # a total outage.
+    health = [{"subsystem": "wan", "status": "error", "wan_ip": ""},
+              {"subsystem": "www", "status": "error"}]
+    devices = [{"type": "udm",
+                "wan1": {"up": False, "ifname": "eth4", "ip": ""},
+                "wan3": {"up": True, "ifname": "gre1", "type": "wireless_5g",
+                         "mbb_state": "ready", "ip": ""}}]
+
+    links = metrics.wan_links_from(health, devices)
+    assert [link.active for link in links] == [False, False]
+    assert metrics.wan_from(health, devices).online is False
+
+
+def test_a_link_without_an_address_is_never_guessed_as_active():
+    # No health data at all, so guessing is allowed - but an interface holding
+    # no address cannot be the one carrying traffic.
+    links = metrics.wan_links_from([], [{"type": "udm",
+        "wan1": {"up": False, "ip": ""},
+        "wan3": {"up": True, "ifname": "gre1", "ip": ""}}])
+    assert [link.active for link in links] == [False, False]
+
+
+def test_a_healthy_wan_still_resolves_an_active_link_without_an_ip_match():
+    links = metrics.wan_links_from(
+        [{"subsystem": "wan", "status": "ok"}],
+        [{"type": "udm", "wan1": {"up": True, "ip": "192.0.2.20"}}],
+    )
+    assert links[0].active is True

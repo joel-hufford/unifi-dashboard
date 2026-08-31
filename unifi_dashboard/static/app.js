@@ -173,8 +173,16 @@
     banner.textContent = reasons.join(" · ") || "Something is wrong";
   }
 
+  // A link reporting up is not the same as a link carrying traffic: a
+  // cellular backup is a tunnel and reports up whenever it exists. Only the
+  // active link is green, and one that is up without an address is flagged,
+  // because it cannot take over in that state.
   const LINK_STATE = (link) =>
-    !link ? "unknown" : !link.up ? "critical" : link.active ? "ok" : "idle";
+    !link ? "unknown"
+      : !link.up ? "critical"
+      : link.active ? "ok"
+      : link.ip ? "idle"
+      : "warning";
 
   function selectedLink(data) {
     const links = data.wan_links || [];
@@ -220,7 +228,11 @@
 
       const note = document.createElement("span");
       note.className = "chip-note";
-      note.textContent = !link.up ? "down" : link.active ? "active" : "standby";
+      note.textContent = !link.up
+        ? "down"
+        : link.active ? "active"
+        : link.ip ? "standby"
+        : "no address";
 
       chip.append(lamp, label, note);
       chip.addEventListener("click", () => {
@@ -274,7 +286,10 @@
     $("hero-lamp").dataset.state = LINK_STATE(link);
     $("hero-state-word").textContent = !link
       ? (wan.online ? "Online" : "Offline")
-      : !link.up ? "Offline" : link.active ? "Online" : "Standby";
+      : !link.up ? "Offline"
+      : link.active ? "Online"
+      : link.ip ? "Standby"
+      : "No address";
 
     const address = (link ? link.ip : wan.ip) || null;
     $("hero-ip").textContent = address
@@ -360,7 +375,7 @@
   }
 
   function standbyDetail(link) {
-    const bits = ["Standby"];
+    const bits = [link && link.up && !link.ip ? "Up, but holds no address" : "Standby"];
     if (link && link.isp) bits.push(link.isp);
     if (link && link.uptime_s) bits.push(`up ${duration(link.uptime_s)}`);
     return bits.join(" · ");

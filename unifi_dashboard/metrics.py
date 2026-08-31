@@ -320,19 +320,34 @@ def wan_links_from(health: list[dict], devices: list[dict]) -> list[WanLink]:
     if not links:
         return links
 
+    wan_health = subsystems.get("wan", {})
+    www = subsystems.get("www", {})
+
     # The active link is the one whose address the controller reports as *the*
-    # WAN address; failing that, the first one that is up.
-    chosen = next((l for l in links if active_ip and l.ip == active_ip), None)
+    # WAN address. Failing that, guess - but only when the controller has not
+    # already said the WAN is down, and only among links that actually hold an
+    # address. A cellular backup is a tunnel: it reports up whenever the
+    # interface exists, which is not the same as carrying traffic, so guessing
+    # from `up` alone lights it green during a total outage.
+    reported = _first_str(wan_health, "status") or _first_str(www, "status")
+    wan_is_down = reported is not None and reported.lower() != "ok"
+
+    chosen = next((link for link in links if active_ip and link.ip == active_ip), None)
+    if chosen is None and not wan_is_down:
+        chosen = next((link for link in links if link.up and link.ip), None)
+
+    # Nothing is marked active when nothing is carrying traffic. Every caller
+    # has to cope with that, because it is a state the network really has.
     if chosen is None:
-        chosen = next((l for l in links if l.up), links[0])
+        return links
+
     chosen.active = True
 
     # The health subsystems describe the active uplink only, and carry detail
     # the interface object does not: the ISP name lives there, and per-link
     # uptime is not reported at all.
-    www = subsystems.get("www", {})
     if chosen.isp is None:
-        chosen.isp = _first_str(subsystems.get("wan", {}), "isp_name") or _first_str(
+        chosen.isp = _first_str(wan_health, "isp_name") or _first_str(
             www, "isp_name", "isp_organization"
         )
     if chosen.uptime_s is None:
