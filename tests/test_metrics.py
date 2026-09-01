@@ -307,3 +307,35 @@ def test_a_healthy_wan_still_resolves_an_active_link_without_an_ip_match():
         [{"type": "udm", "wan1": {"up": True, "ip": "192.0.2.20"}}],
     )
     assert links[0].active is True
+
+
+def test_a_stale_wan_address_does_not_keep_a_dead_link_active():
+    # Reported from hardware, second round: with both uplinks pulled, WAN 1
+    # stayed green. A DHCP lease outlives the cable, so the controller was
+    # still reporting the old wan_ip and the interface still carried it - and
+    # the IP-match branch neither checked the WAN's reported health nor whether
+    # the interface was up.
+    health = [{"subsystem": "wan", "status": "error", "wan_ip": "10.199.99.155"},
+              {"subsystem": "www", "status": "error"}]
+    devices = [{"type": "udm",
+                "wan1": {"up": False, "ifname": "eth4", "ip": "10.199.99.155"},
+                "wan3": {"up": True, "ifname": "gre1", "type": "wireless_5g", "ip": ""}}]
+
+    assert [link.active for link in metrics.wan_links_from(health, devices)] == [False, False]
+
+    # Same, but the port has not noticed yet either.
+    devices[0]["wan1"]["up"] = True
+    assert [link.active for link in metrics.wan_links_from(health, devices)] == [False, False]
+
+
+def test_a_down_interface_is_never_active_even_with_a_matching_address():
+    # The controller says the WAN is fine and names an address the down
+    # interface still holds. Being down beats the address match.
+    links = metrics.wan_links_from(
+        [{"subsystem": "wan", "status": "ok", "wan_ip": "10.199.99.155"}],
+        [{"type": "udm",
+          "wan1": {"up": False, "ip": "10.199.99.155"},
+          "wan3": {"up": True, "ifname": "gre1", "ip": "198.51.100.7"}}],
+    )
+    assert links[0].active is False
+    assert links[1].active is True      # the one that is actually up

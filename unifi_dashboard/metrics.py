@@ -332,8 +332,19 @@ def wan_links_from(health: list[dict], devices: list[dict]) -> list[WanLink]:
     reported = _first_str(wan_health, "status") or _first_str(www, "status")
     wan_is_down = reported is not None and reported.lower() != "ok"
 
-    chosen = next((link for link in links if active_ip and link.ip == active_ip), None)
-    if chosen is None and not wan_is_down:
+    # When the controller says the WAN is down, nothing is active - not even a
+    # link whose address still matches. A DHCP lease outlives the cable, so
+    # both the health block and the interface can still be carrying the old
+    # address moments after it stopped working.
+    if wan_is_down:
+        return links
+
+    # Otherwise the active link is the one holding the WAN address, and a link
+    # reported down can never be it however well its stale address matches.
+    chosen = next(
+        (link for link in links if active_ip and link.ip == active_ip and link.up), None
+    )
+    if chosen is None:
         chosen = next((link for link in links if link.up and link.ip), None)
 
     # Nothing is marked active when nothing is carrying traffic. Every caller

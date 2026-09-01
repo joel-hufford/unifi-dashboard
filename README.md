@@ -142,13 +142,22 @@ Slots are discovered rather than assumed: numbering is not contiguous in the
 wild, and a cellular backup commonly reports as `wan3` with no `wan2`. Cellular
 links are recognised from the interface name and labelled as such.
 
-**A link reporting `up` is not a link carrying traffic.** A UniFi cellular
-backup is a GRE tunnel and reports up whenever the interface exists, so during
-a total outage it will still say so. Only the link the controller names as
-holding the WAN address is shown active; when the controller reports the WAN
-down, *nothing* is marked active, because that is the state the network is
-actually in. A link that is up but holds no address is flagged rather than
-shown as a healthy standby - it cannot take over in that condition.
+**A link reporting `up` is not a link carrying traffic**, and neither is a
+link holding an address. A UniFi cellular backup is a GRE tunnel and reports up
+whenever the interface exists; a DHCP lease outlives the cable, so both the
+health block and the interface can still be carrying the old address moments
+after it stopped working. Three rules follow:
+
+- when the controller reports the WAN down, **nothing** is marked active, no
+  matter whose address still matches
+- a link reported down is never active, however well its address matches
+- nothing shows green while the measured path is broken - the ICMP and DNS
+  probes run from the Pi, and if they are failing, no interface gets to claim
+  it is fine
+
+A wired standby holding no address is flagged, since it cannot take over. An
+idle cellular backup holding no address is not: dialling only on demand is
+normal.
 
 Selecting a cellular link swaps the Internet/DNS/loss row for its radio
 detail - signal percentage, RSRP, SINR and the aggregated bands - which is what

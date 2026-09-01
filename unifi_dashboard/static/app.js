@@ -173,16 +173,33 @@
     banner.textContent = reasons.join(" · ") || "Something is wrong";
   }
 
-  // A link reporting up is not the same as a link carrying traffic: a
-  // cellular backup is a tunnel and reports up whenever it exists. Only the
-  // active link is green, and one that is up without an address is flagged,
-  // because it cannot take over in that state.
-  const LINK_STATE = (link) =>
-    !link ? "unknown"
-      : !link.up ? "critical"
-      : link.active ? "ok"
-      : link.ip ? "idle"
-      : "warning";
+  // A link reporting up is not the same as a link carrying traffic: a cellular
+  // backup is a tunnel and reports up whenever it exists, and a DHCP lease
+  // outlives the cable. Nothing shows green while the measured path is broken,
+  // whatever the controller claims about the interface.
+  function noService(data) {
+    const wan = (data && data.wan) || {};
+    return wan.online === false || wan.reachable === false;
+  }
+
+  function linkState(link, data) {
+    if (!link) return "unknown";
+    if (!link.up) return "critical";
+    if (noService(data)) return "warning";
+    if (link.active) return "ok";
+    if (link.ip) return "idle";
+    // A cellular backup that only dials on demand holds no address while idle,
+    // which is normal. A wired standby with no address is not.
+    return link.cellular ? "idle" : "warning";
+  }
+
+  function linkNote(link, data) {
+    if (!link.up) return "down";
+    if (noService(data)) return "no service";
+    if (link.active) return "active";
+    if (link.ip) return "standby";
+    return link.cellular ? "standby" : "no address";
+  }
 
   function selectedLink(data) {
     const links = data.wan_links || [];
@@ -205,7 +222,7 @@
       fallback.className = "wan-chip";
       const lamp = document.createElement("span");
       lamp.className = "lamp";
-      lamp.dataset.state = data.wan?.online ? "ok" : "critical";
+      lamp.dataset.state = noService(data) ? "critical" : "ok";
       const label = document.createElement("span");
       label.textContent = "WAN";
       fallback.append(lamp, label);
@@ -221,18 +238,14 @@
 
       const lamp = document.createElement("span");
       lamp.className = "lamp";
-      lamp.dataset.state = LINK_STATE(link);
+      lamp.dataset.state = linkState(link, data);
 
       const label = document.createElement("span");
       label.textContent = link.label || link.key.toUpperCase();
 
       const note = document.createElement("span");
       note.className = "chip-note";
-      note.textContent = !link.up
-        ? "down"
-        : link.active ? "active"
-        : link.ip ? "standby"
-        : "no address";
+      note.textContent = linkNote(link, data);
 
       chip.append(lamp, label, note);
       chip.addEventListener("click", () => {
@@ -283,10 +296,11 @@
     speedBadge.hidden = !underspeed;
     if (underspeed) speedBadge.textContent = `${gbps(negotiated)} of ${gbps(capable)}`;
 
-    $("hero-lamp").dataset.state = LINK_STATE(link);
+    $("hero-lamp").dataset.state = linkState(link, data);
     $("hero-state-word").textContent = !link
       ? (wan.online ? "Online" : "Offline")
       : !link.up ? "Offline"
+      : noService(data) ? "No service"
       : link.active ? "Online"
       : link.ip ? "Standby"
       : "No address";
