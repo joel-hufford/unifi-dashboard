@@ -367,6 +367,8 @@ body {
   border-top: 1px solid var(--border);
 }
 
+.check[hidden] { display: none; }
+
 .check {
   display: grid;
   grid-template-columns: auto auto;

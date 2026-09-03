@@ -174,6 +174,12 @@ class DemoSource:
                 "model": "UDMPRO",
                 "state": 1,
                 "upgradable": False,
+                "temperatures": [
+                    {"name": "CPU", "type": "cpu", "value": round(58 + self.rng.uniform(-3, 9), 1)},
+                    {"name": "PHY", "type": "phy", "value": round(51 + self.rng.uniform(-2, 5), 1)},
+                ],
+                "overheating": False,
+                "system-stats": {"cpu": "11.8", "mem": "42.3"},
                 # Shaped like a real UCG-Max: no wan_networkgroup, `name` is
                 # the interface name, and the cellular link is an mbb tunnel.
                 "wan1": {

@@ -135,6 +135,19 @@ class WanLink:
 
 
 @dataclass
+class GatewayHealth:
+    """The gateway's own vitals, as opposed to the WAN's."""
+
+    name: str | None = None
+    model: str | None = None
+    temperature_c: float | None = None
+    temperature_sensor: str | None = None     # which sensor the reading came from
+    overheating: bool = False
+    cpu_pct: float | None = None
+    mem_pct: float | None = None
+
+
+@dataclass
 class ClientEntry:
     """One connected client, as the on-screen directory shows it."""
 
@@ -424,6 +437,57 @@ def wan_from(health: list[dict], devices: list[dict]) -> WanStatus:
     status.speedtest_ts = _first_num(www, "speedtest_lastrun")
     status.speedtest_status = _first_str(www, "speedtest_status")
     return status
+
+
+def gateway_temperature(device: dict | None) -> tuple[float | None, str | None]:
+    """The gateway's temperature and which sensor it came from.
+
+    Firmware reports this two ways. Newer devices publish a `temperatures`
+    list of named sensors; older ones a single `general_temperature`. Where
+    there are several, the CPU sensor is preferred and otherwise the hottest,
+    since a single number on a panel should be the one worth worrying about.
+    """
+    if not isinstance(device, dict):
+        return None, None
+
+    sensors = device.get("temperatures")
+    readings: list[tuple[float, str]] = []
+    if isinstance(sensors, list):
+        for sensor in sensors:
+            if not isinstance(sensor, dict):
+                continue
+            value = _num(sensor.get("value"))
+            if value is None:
+                continue
+            label = _first_str(sensor, "name", "type") or "sensor"
+            readings.append((value, label))
+
+    if readings:
+        cpu = next((r for r in readings if "cpu" in r[1].lower()), None)
+        value, label = cpu if cpu else max(readings, key=lambda r: r[0])
+        return round(value, 1), label
+
+    general = _first_num(device, "general_temperature", "temperature")
+    return (round(general, 1), "system") if general is not None else (None, None)
+
+
+def gateway_health_from(devices: list[dict]) -> GatewayHealth:
+    device = find_gateway(devices)
+    if not isinstance(device, dict):
+        return GatewayHealth()
+
+    temperature, sensor = gateway_temperature(device)
+    stats = device.get("system-stats")
+    stats = stats if isinstance(stats, dict) else {}
+    return GatewayHealth(
+        name=_first_str(device, "name"),
+        model=_first_str(device, "model"),
+        temperature_c=temperature,
+        temperature_sensor=sensor,
+        overheating=bool(device.get("overheating")),
+        cpu_pct=_first_num(stats, "cpu"),
+        mem_pct=_first_num(stats, "mem"),
+    )
 
 
 def _ip_sort_key(entry: ClientEntry) -> tuple:

@@ -73,11 +73,21 @@ class ChartConfig:
 
 
 @dataclass
+class GatewayConfig:
+    """When to be concerned about the gateway's own temperature."""
+
+    temp_warning_c: float = 80.0
+    temp_critical_c: float = 90.0
+
+
+@dataclass
 class UiConfig:
     # The theme the panel starts in. The on-screen toggle only changes the
     # current session, so a stray touch on a wall panel corrects itself on the
     # next refresh rather than leaving the display light until someone notices.
     theme: str = "dark"
+    # "C" or "F". The controller reports Celsius; this only changes the display.
+    temperature_unit: str = "C"
 
 
 @dataclass
@@ -131,6 +141,7 @@ class Config:
     dns: DnsConfig = field(default_factory=DnsConfig)
     ui: UiConfig = field(default_factory=UiConfig)
     charts: ChartConfig = field(default_factory=ChartConfig)
+    gateway: GatewayConfig = field(default_factory=GatewayConfig)
     public_ip: PublicIpConfig = field(default_factory=PublicIpConfig)
     alarm: AlarmConfig = field(default_factory=AlarmConfig)
     server: ServerConfig = field(default_factory=ServerConfig)
@@ -192,6 +203,7 @@ _NESTED = {
     "dns": DnsConfig,
     "ui": UiConfig,
     "charts": ChartConfig,
+    "gateway": GatewayConfig,
     "public_ip": PublicIpConfig,
     "alarm": AlarmConfig,
     "server": ServerConfig,

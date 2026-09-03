@@ -14,7 +14,7 @@ from starlette.types import Scope
 from .config import Config
 from dataclasses import asdict
 
-from .metrics import _WAN_KEY, client_list_from, find_gateway
+from .metrics import _WAN_KEY, client_list_from, find_gateway, gateway_health_from
 from .poller import Poller
 from .storage import History
 from .unifi_client import UniFiClient
@@ -79,6 +79,9 @@ def create_app(cfg: Config) -> FastAPI:
             "ping_target": cfg.ping.target,
             "dns_host": cfg.dns.probe_host,
             "theme": cfg.ui.theme,
+            "temperature_unit": cfg.ui.temperature_unit,
+            "temp_warning_c": cfg.gateway.temp_warning_c,
+            "temp_critical_c": cfg.gateway.temp_critical_c,
             "throughput_scale": cfg.charts.throughput_scale,
             "log_decades": cfg.charts.log_decades,
             "demo": cfg.demo,
@@ -86,6 +89,29 @@ def create_app(cfg: Config) -> FastAPI:
         # 200 even when the controller is down: the page wants the last good
         # snapshot plus the error, not an exception.
         return JSONResponse(payload)
+
+    @app.get("/api/debug/gateway")
+    async def debug_gateway():
+        """What the gateway reports about itself.
+
+        Deliberately narrow: the sensor fields, plus a list of the keys the
+        device object has, which is enough to tell whether a reading exists
+        under a name this code does not know yet. No client data, no MAC table.
+        """
+        device = find_gateway(poller.last_raw.get("devices") or [])
+        device = device if isinstance(device, dict) else {}
+        return JSONResponse({
+            "model": device.get("model"),
+            "name": device.get("name"),
+            "sensor_fields": {
+                key: device.get(key)
+                for key in ("temperatures", "general_temperature", "temperature",
+                            "overheating", "system-stats")
+                if key in device
+            },
+            "available_keys": sorted(device),
+            "parsed": asdict(gateway_health_from(poller.last_raw.get("devices") or [])),
+        })
 
     @app.get("/api/clients")
     async def clients():

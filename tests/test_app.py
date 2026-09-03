@@ -107,3 +107,21 @@ def test_speedtest_can_be_started_from_the_panel():
         assert response.status_code == 200
         assert response.json()["running"] is True
         assert client.get("/api/dashboard").json()["speedtest"]["running"] is True
+
+
+def test_gateway_vitals_and_temperature_settings_reach_the_page():
+    with demo_client() as client:
+        payload = client.get("/api/dashboard").json()
+        assert payload["gateway"]["temperature_c"] is not None
+        assert payload["gateway"]["temperature_sensor"] == "CPU"
+        assert payload["config"]["temperature_unit"] == "C"
+        assert payload["config"]["temp_warning_c"] == 80.0
+
+
+def test_gateway_debug_endpoint_shows_sensors_without_client_data():
+    with demo_client() as client:
+        client.get("/api/dashboard")
+        payload = client.get("/api/debug/gateway").json()
+        assert "temperatures" in payload["sensor_fields"]
+        assert "available_keys" in payload      # enough to spot an unknown field name
+        assert "mac_table" not in str(payload)

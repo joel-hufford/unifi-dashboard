@@ -24,6 +24,7 @@ shrinking:
 | WAN download and upload for the last hour | sampled every poll and stored locally |
 | Average and peak download / upload | aggregated over the visible window |
 | Wi-Fi connection quality | per-client satisfaction, or signal where the controller has none |
+| Gateway temperature | the device's own sensors, where it has any |
 | Weakest clients, clients per band, UniFi device health | `stat/sta`, `stat/device` |
 
 Latency and loss are measured from the Pi on purpose. The controller's own
@@ -102,6 +103,25 @@ without breaking anything:
 ```bash
 python -m unifi_dashboard --demo-fault dns        # or wan-down, loss, latency, failover
 ```
+
+## Gateway temperature
+
+The WAN card shows the gateway's own temperature beside the packet-loss
+indicator, with thresholds in `[gateway]` and the unit (`C` or `F`) in `[ui]`.
+
+Firmware reports this two ways: newer devices publish a `temperatures` list of
+named sensors, older ones a single `general_temperature`. Both are read, and
+where there are several sensors the CPU one is preferred, falling back to the
+hottest - a single number on a panel should be the one worth worrying about.
+The `overheating` flag, if the device sets it, turns the indicator red
+regardless of the reading.
+
+**Not every model reports a temperature.** When none is available the readout
+is hidden rather than showing a dash or a fabricated zero, either of which
+would read as a fault. `GET /api/debug/gateway` shows what your gateway
+actually publishes - the sensor fields plus the list of keys the device object
+has, which is enough to spot a reading under a name this code does not know
+yet.
 
 ## Two addresses
 

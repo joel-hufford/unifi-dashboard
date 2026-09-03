@@ -15,6 +15,7 @@ from .metrics import (
     active_link,
     clients_from,
     devices_from,
+    gateway_health_from,
     wan_from,
     wan_links_from,
     wlan_quality_from,
@@ -118,6 +119,7 @@ class Poller:
         links = wan_links_from(raw["health"], raw["devices"])
         clients = clients_from(raw["clients"])
         devices = devices_from(raw["devices"])
+        gateway = gateway_health_from(raw["devices"])
         wlan = wlan_quality_from(raw["clients"], weak_signal_dbm=self.cfg.wlan.weak_signal_dbm)
 
         rx_bps, tx_bps = self._rates(wan, now)
@@ -187,6 +189,7 @@ class Poller:
             },
             "clients": asdict(clients),
             "devices": asdict(devices),
+            "gateway": asdict(gateway),
             "wlan": asdict(wlan),
         }
         return self.snapshot

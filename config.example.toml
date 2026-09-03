@@ -87,11 +87,19 @@ throughput_scale = "log"
 # Decades the log axis spans below its top. Three covers roughly 0.5-500 Mbps.
 log_decades = 3.0
 
+[gateway]
+# When the gateway's own temperature is worth noticing. Not every model
+# reports one; the readout is hidden entirely when none is available.
+temp_warning_c = 80.0
+temp_critical_c = 90.0
+
 [ui]
 # The theme the panel starts in: "dark" or "light". The on-screen toggle only
 # changes the current session, so a stray touch corrects itself on the next
 # refresh instead of leaving a wall panel in the wrong theme.
 theme = "dark"
+# "C" or "F". The controller reports Celsius; this only changes the display.
+temperature_unit = "C"
 
 [server]
 host = "127.0.0.1"  # 0.0.0.0 to reach the dashboard from other machines

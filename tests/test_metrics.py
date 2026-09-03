@@ -339,3 +339,46 @@ def test_a_down_interface_is_never_active_even_with_a_matching_address():
     )
     assert links[0].active is False
     assert links[1].active is True      # the one that is actually up
+
+
+# --- the gateway's own vitals ----------------------------------------------
+
+def test_temperature_from_a_named_sensor_list_prefers_the_cpu():
+    # Newer firmware publishes several sensors. The CPU one is the number worth
+    # putting on a panel, not whichever happens to come first.
+    device = [{"type": "udm", "temperatures": [
+        {"name": "PHY", "type": "phy", "value": 55.0},
+        {"name": "CPU", "type": "cpu", "value": 62.5},
+        {"name": "System", "type": "board", "value": 48.0},
+    ]}]
+    assert metrics.gateway_temperature(device[0]) == (62.5, "CPU")
+    assert metrics.gateway_health_from(device).temperature_c == 62.5
+
+
+def test_without_a_cpu_sensor_the_hottest_one_wins():
+    device = {"type": "udm", "temperatures": [
+        {"name": "PHY", "value": 51.0}, {"name": "Board", "value": 63.0},
+    ]}
+    assert metrics.gateway_temperature(device) == (63.0, "Board")
+
+
+def test_older_firmware_reports_a_single_value():
+    assert metrics.gateway_temperature({"general_temperature": 57}) == (57.0, "system")
+
+
+def test_a_gateway_with_no_sensor_reports_nothing_rather_than_zero():
+    # Not every model has one, and a fabricated 0 would read as a fault.
+    assert metrics.gateway_temperature({"type": "udm", "name": "gw"}) == (None, None)
+    assert metrics.gateway_health_from([{"type": "udm"}]).temperature_c is None
+    assert metrics.gateway_health_from([]).temperature_c is None
+
+
+def test_gateway_health_carries_the_overheating_flag_and_system_stats():
+    health = metrics.gateway_health_from([{
+        "type": "udm", "name": "UCG", "model": "UCGMAX",
+        "general_temperature": 91, "overheating": True,
+        "system-stats": {"cpu": "12.4", "mem": "38.1"},
+    }])
+    assert health.overheating is True
+    assert health.model == "UCGMAX"
+    assert health.cpu_pct == 12.4 and health.mem_pct == 38.1

@@ -266,6 +266,23 @@
     return `${Math.round(age / 86400)}d ago`;
   }
 
+  function temperatureText(celsius, unit) {
+    if (celsius == null) return "—";
+    return unit === "F"
+      ? `${Math.round(celsius * 9 / 5 + 32)}\u00b0F`
+      : `${Math.round(celsius)}\u00b0C`;
+  }
+
+  function temperatureState(gateway, limits) {
+    if (!gateway || gateway.temperature_c == null) return "unknown";
+    if (gateway.overheating) return "critical";
+    const critical = limits?.temp_critical_c ?? 90;
+    const warning = limits?.temp_warning_c ?? 80;
+    if (gateway.temperature_c >= critical) return "critical";
+    if (gateway.temperature_c >= warning) return "warning";
+    return "ok";
+  }
+
   function signalState(pct) {
     if (pct == null) return "unknown";
     if (pct >= 60) return "ok";
@@ -355,6 +372,21 @@
       const status = lossStatus(loss);
       $("check-loss-lamp").dataset.state = status === "good" ? "ok" : status;
       $("check-loss-value").textContent = loss == null ? "—" : `${loss.toFixed(loss >= 10 ? 0 : 1)}%`;
+
+      // Only shown when the gateway actually reports a sensor: not every model
+      // does, and an empty cell is worse than no cell.
+      const gateway = data.gateway || {};
+      const cell = $("check-temp");
+      cell.hidden = gateway.temperature_c == null;
+      if (!cell.hidden) {
+        const unit = data.config?.temperature_unit || "C";
+        $("check-temp-lamp").dataset.state = temperatureState(gateway, data.config);
+        $("check-temp-value").textContent = temperatureText(gateway.temperature_c, unit);
+        $("check-temp-name").textContent = gateway.overheating ? "Overheating" : "Gateway";
+        cell.title = gateway.temperature_sensor
+          ? `${gateway.temperature_sensor} sensor`
+          : "gateway temperature";
+      }
     }
 
     $("hero-foot").textContent = heroFoot(data, link, viewingActive);
