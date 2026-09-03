@@ -9,6 +9,7 @@ import uvicorn
 
 from .app import create_app
 from .config import Config
+from .demo import DemoSource
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -19,7 +20,9 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--demo", action="store_true", help="serve synthetic data, no controller needed")
     parser.add_argument(
         "--demo-fault",
-        choices=("none", "quiet", "wan-down", "dns", "loss", "latency", "failover"),
+        # Taken from the source itself, so a new fault is offered here the
+        # moment it exists rather than whenever someone remembers this list.
+        choices=DemoSource.FAULTS,
         default="none",
         help="with --demo, inject a fault or traffic profile for testing",
     )

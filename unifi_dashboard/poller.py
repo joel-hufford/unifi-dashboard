@@ -155,6 +155,11 @@ class Poller:
             loss_pct=probe.loss_pct,
             latency_ms=probe.avg_ms,
             on_backup=on_backup,
+            temperature_c=gateway.temperature_c,
+            overheating=gateway.overheating,
+            temp_warning_c=self.cfg.gateway.temp_warning_c,
+            temp_critical_c=self.cfg.gateway.temp_critical_c,
+            temperature_unit=self.cfg.ui.temperature_unit,
         )
 
         self.last_success = now

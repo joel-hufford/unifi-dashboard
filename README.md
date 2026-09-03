@@ -101,7 +101,7 @@ Thresholds are in the `[alarm]` section of the config. To see the states
 without breaking anything:
 
 ```bash
-python -m unifi_dashboard --demo-fault dns        # or wan-down, loss, latency, failover
+python -m unifi_dashboard --demo-fault dns        # or wan-down, loss, latency, failover, hot
 ```
 
 ## Gateway temperature
@@ -115,6 +115,13 @@ where there are several sensors the CPU one is preferred, falling back to the
 hottest - a single number on a panel should be the one worth worrying about.
 The `overheating` flag, if the device sets it, turns the indicator red
 regardless of the reading.
+
+Heat also drives the screen border, on the same thresholds: amber past
+`temp_warning_c`, red past `temp_critical_c` or whenever the device raises its
+own `overheating` flag. The border is not a WAN indicator - it means *walk to
+the rack*, and a gateway cooking itself qualifies. An outage still takes the
+headline when both are true; the temperature appears as a second reason.
+`--demo-fault hot` shows it without heating any real hardware.
 
 **Not every model reports a temperature.** When none is available the readout
 is hidden rather than showing a dash or a fabricated zero, either of which

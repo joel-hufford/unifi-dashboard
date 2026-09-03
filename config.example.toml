@@ -90,6 +90,8 @@ log_decades = 3.0
 [gateway]
 # When the gateway's own temperature is worth noticing. Not every model
 # reports one; the readout is hidden entirely when none is available.
+# These also light the screen border - amber at the warning line, red at the
+# critical one - so raise them if your gateway idles hot enough to nag.
 temp_warning_c = 80.0
 temp_critical_c = 90.0
 

@@ -31,7 +31,7 @@ class DemoSource:
 
     #: Fault injections, so the alarm states can be seen without breaking a
     #: real network to do it. Selected with --demo-fault.
-    FAULTS = ("none", "quiet", "wan-down", "dns", "loss", "latency", "failover")
+    FAULTS = ("none", "quiet", "wan-down", "dns", "loss", "latency", "failover", "hot")
 
     def __init__(self, seed: int | None = None, fault: str = "none") -> None:
         self.rng = random.Random(seed)
@@ -142,6 +142,9 @@ class DemoSource:
 
         failed_over = self.fault == "failover"
         wan_down = self.fault == "wan-down"
+        # Far enough past the default 90C critical that jitter cannot dip it
+        # back under and make the border flicker while someone is watching it.
+        cpu_temp = 94.0 if self.fault == "hot" else 58.0
         primary_ip = "203.0.113.47"
         backup_ip = "100.71.14.9"
         active_ip = backup_ip if failed_over else primary_ip
@@ -175,7 +178,7 @@ class DemoSource:
                 "state": 1,
                 "upgradable": False,
                 "temperatures": [
-                    {"name": "CPU", "type": "cpu", "value": round(58 + self.rng.uniform(-3, 9), 1)},
+                    {"name": "CPU", "type": "cpu", "value": round(cpu_temp + self.rng.uniform(-3, 9), 1)},
                     {"name": "PHY", "type": "phy", "value": round(51 + self.rng.uniform(-2, 5), 1)},
                 ],
                 "overheating": False,

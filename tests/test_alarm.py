@@ -61,3 +61,36 @@ def test_the_headline_is_the_most_fundamental_failure():
     alarm = check(wan_up=False, internet_reachable=False, dns_ok=False, loss_pct=100.0)
     assert alarm.headline == "WAN is down"
     assert alarm.level == CRITICAL
+
+
+HOT = dict(temp_warning_c=80.0, temp_critical_c=90.0)
+
+
+def test_gateway_heat_crosses_warning_then_critical():
+    assert check(temperature_c=79.0, **HOT).level == OK
+    assert check(temperature_c=80.0, **HOT).level == WARNING
+    assert check(temperature_c=90.0, **HOT).level == CRITICAL
+
+
+def test_the_controllers_own_overheating_flag_wins():
+    # UniFi knows the per-model limit better than a threshold we picked, so a
+    # device that says it is overheating is critical whatever the number says.
+    alarm = check(temperature_c=61.0, overheating=True, **HOT)
+    assert alarm.level == CRITICAL
+    assert alarm.headline == "Gateway overheating"
+
+
+def test_heat_is_reported_in_the_unit_on_screen():
+    assert check(temperature_c=95.0, temperature_unit="F", **HOT).headline == "Gateway at 203°F"
+    assert check(temperature_c=95.0, **HOT).headline == "Gateway at 95°C"
+
+
+def test_a_missing_temperature_is_not_an_alarm():
+    # Not every model reports one, and silence is not heat.
+    assert check(temperature_c=None, **HOT).level == OK
+
+
+def test_an_outage_still_leads_over_a_hot_gateway():
+    alarm = check(wan_up=False, temperature_c=95.0, **HOT)
+    assert alarm.headline == "WAN is down"
+    assert "Gateway at 95°C" in alarm.reasons

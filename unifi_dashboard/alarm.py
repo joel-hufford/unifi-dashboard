@@ -34,6 +34,14 @@ class Alarm:
         return self.reasons[0] if self.reasons else None
 
 
+def _temperature_label(celsius: float, unit: str) -> str:
+    """Match the unit the panel is displaying, so the banner and the readout
+    below it do not disagree about how hot the gateway is."""
+    if unit.upper() == "F":
+        return f"{round(celsius * 9 / 5 + 32)}\u00b0F"
+    return f"{round(celsius)}\u00b0C"
+
+
 def evaluate(
     cfg: AlarmConfig,
     *,
@@ -44,6 +52,11 @@ def evaluate(
     loss_pct: float | None,
     latency_ms: float | None,
     on_backup: bool = False,
+    temperature_c: float | None = None,
+    overheating: bool = False,
+    temp_warning_c: float | None = None,
+    temp_critical_c: float | None = None,
+    temperature_unit: str = "C",
 ) -> Alarm:
     """Order matters: the first reason recorded becomes the headline, so the
     most fundamental failure is checked first."""
@@ -58,6 +71,18 @@ def evaluate(
         alarm.raise_to(CRITICAL, "No route to the internet")
     if dns_ok is False:
         alarm.raise_to(CRITICAL, "DNS is not resolving")
+
+    # The gateway's own heat. Not a WAN fault, but the frame exists to make
+    # someone walk to the rack, and a gateway cooking itself is worth the walk
+    # - often before it becomes a WAN fault a few minutes later.
+    if overheating:
+        alarm.raise_to(CRITICAL, "Gateway overheating")
+    elif temperature_c is not None:
+        reading = _temperature_label(temperature_c, temperature_unit)
+        if temp_critical_c is not None and temperature_c >= temp_critical_c:
+            alarm.raise_to(CRITICAL, f"Gateway at {reading}")
+        elif temp_warning_c is not None and temperature_c >= temp_warning_c:
+            alarm.raise_to(WARNING, f"Gateway at {reading}")
 
     if loss_pct is not None:
         if loss_pct >= cfg.loss_pct_critical:

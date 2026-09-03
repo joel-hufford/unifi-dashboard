@@ -206,3 +206,24 @@ async def test_a_refused_speedtest_records_the_reason_and_does_not_look_pending(
     state = (await poller.tick())["speedtest"]
     assert state["running"] is False
     assert "refused" in state["error"]
+
+
+@pytest.mark.asyncio
+async def test_a_hot_gateway_raises_the_alarm_while_the_wan_is_healthy():
+    # The frame is there to make someone walk to the rack. A gateway cooking
+    # itself is a reason to walk even when every link is up.
+    poller = make_poller()
+    poller.demo.fault = "hot"
+    snapshot = await poller.tick()
+
+    assert snapshot["wan"]["online"] is True
+    assert snapshot["gateway"]["temperature_c"] >= 90
+    assert snapshot["alarm"]["level"] == "critical"
+    assert any(r.startswith("Gateway at") for r in snapshot["alarm"]["reasons"])
+
+
+@pytest.mark.asyncio
+async def test_a_cool_gateway_says_nothing():
+    snapshot = await make_poller().tick()
+    assert snapshot["gateway"]["temperature_c"] < 80
+    assert snapshot["alarm"]["level"] == "ok"
