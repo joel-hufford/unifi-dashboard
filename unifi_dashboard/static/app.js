@@ -19,6 +19,7 @@
     hoverIndex: null,
     timer: null,
     touchTimer: null,
+    build: null,            // the front-end build this page was loaded from
   };
 
   // The client directory is fetched on open, not polled: it is a thing you go
@@ -100,6 +101,7 @@
     try {
       const first = state.data === null;
       state.data = payload;
+      checkForNewBuild(payload);
       if (first && payload.config && payload.config.theme) {
         document.documentElement.dataset.theme = payload.config.theme;
       }
@@ -111,6 +113,27 @@
         `Display error - try a hard refresh (Ctrl+Shift+R): ${error.message}`,
       );
     }
+  }
+
+  // After an update the service is running new code while this page is still
+  // the old one - and on a wall panel there is no keyboard to press F5 with.
+  // The page notices and reloads itself.
+  function checkForNewBuild(payload) {
+    const build = payload.config && payload.config.build;
+    if (!build) return;
+    if (state.build === null) {
+      state.build = build;
+      return;
+    }
+    if (build === state.build) return;
+
+    // Not mid-task: reloading out from under someone reading the client list
+    // or watching a speed test would be its own small betrayal.
+    const busy = !$("clients-overlay").hidden || payload.speedtest?.running;
+    if (busy) return;
+
+    showBanner("warning", "Updated - reloading");
+    setTimeout(() => window.location.reload(), 900);
   }
 
   // Self-rescheduling rather than a fixed interval, so a running speed test
@@ -1228,6 +1251,8 @@
         button.textContent = original;
       }
     });
+
+    $("reload-ui").addEventListener("click", () => window.location.reload());
 
     $("theme-toggle").addEventListener("click", () => {
       setTheme(document.documentElement.dataset.theme === "dark" ? "light" : "dark");
