@@ -101,7 +101,7 @@ Thresholds are in the `[alarm]` section of the config. To see the states
 without breaking anything:
 
 ```bash
-python -m unifi_dashboard --demo-fault dns        # or wan-down, loss, latency, failover, hot
+python -m unifi_dashboard --demo-fault dns        # see --help for the full list
 ```
 
 ## Gateway temperature
@@ -122,6 +122,30 @@ own `overheating` flag. The border is not a WAN indicator - it means *walk to
 the rack*, and a gateway cooking itself qualifies. An outage still takes the
 headline when both are true; the temperature appears as a second reason.
 `--demo-fault hot` shows it without heating any real hardware.
+
+### The WAN DHCP lease
+
+The gateway holds its WAN address on a DHCP lease, and a lease that stops
+renewing is a slow-motion outage: everything works until it abruptly does not.
+
+**What can and cannot be seen.** UniFi gateways run BusyBox `udhcpc`, which
+keeps its lease timers in memory and writes no lease file, so there is no
+countdown to read and no way to observe a renewal failing while the address is
+still valid. What *is* visible from the controller is the consequence: the link
+stays up and the address goes away. That is what the dashboard reports, and it
+is deliberately not labelled as a lease timer, because it is not one.
+
+A wired WAN that has been up with no address for `no_lease_warning_s` turns the
+border amber, and `no_lease_critical_s` turns it red; the link's own lamp
+follows the same thresholds and its label counts the elapsed time. A cellular
+backup that dials on demand is up and addressless whenever it is idle, so it is
+never counted - a permanent warning on a healthy network is the fastest way to
+teach someone to ignore the border. A link that is down is not counted either;
+there is no lease to lose over a dead cable, and "WAN is down" already says it.
+
+Timing starts when the service first sees the condition, so restarting during
+an outage restarts the clock. That delays the warning rather than inventing
+history it did not observe. `--demo-fault no-lease` shows the whole path.
 
 **Not every model reports a temperature.** When none is available the readout
 is hidden rather than showing a dash or a fabricated zero, either of which

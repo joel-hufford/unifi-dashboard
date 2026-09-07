@@ -63,6 +63,14 @@ latency_ms_critical = 400.0
 # Running on the backup WAN is not an outage, but on a metered cellular link
 # it is something you want to notice the same day. Amber by default.
 failover_is_critical = false
+# How long a wired WAN may sit up holding no address before that counts as a
+# failure. The gateway runs BusyBox udhcpc, which publishes no lease timers, so
+# a renewal that is quietly failing cannot be seen from here - only its result,
+# once the address lapses. A DHCP exchange takes seconds and its retries back
+# off at 4, 8, 16, 32, so by 45s several attempts have gone unanswered. Raise
+# these if your uplink is slow to hand out an address after a gateway reboot.
+no_lease_warning_s = 45.0
+no_lease_critical_s = 180.0
 
 [public_ip]
 # Look up the address the internet sees you as, so the panel can show both the

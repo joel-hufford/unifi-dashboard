@@ -34,6 +34,15 @@ class Alarm:
         return self.reasons[0] if self.reasons else None
 
 
+def _duration_label(seconds: float) -> str:
+    """Short enough to sit in a banner read from across the room."""
+    if seconds < 90:
+        return f"{round(seconds)}s"
+    if seconds < 5400:
+        return f"{round(seconds / 60)}m"
+    return f"{seconds / 3600:.1f}h"
+
+
 def _temperature_label(celsius: float, unit: str) -> str:
     """Match the unit the panel is displaying, so the banner and the readout
     below it do not disagree about how hot the gateway is."""
@@ -52,6 +61,8 @@ def evaluate(
     loss_pct: float | None,
     latency_ms: float | None,
     on_backup: bool = False,
+    no_lease_s: float | None = None,
+    no_lease_label: str = "WAN",
     temperature_c: float | None = None,
     overheating: bool = False,
     temp_warning_c: float | None = None,
@@ -71,6 +82,19 @@ def evaluate(
         alarm.raise_to(CRITICAL, "No route to the internet")
     if dns_ok is False:
         alarm.raise_to(CRITICAL, "DNS is not resolving")
+
+    # The gateway runs BusyBox udhcpc, which keeps its lease timers in memory
+    # and publishes nothing, so a renewal quietly failing is invisible from
+    # here. What is visible is the consequence: the link stays up and the
+    # address goes away. That is what this reports - not "renewal failed",
+    # which we cannot see, but "this link is up and holds no address", which
+    # is what a lapsed lease looks like from outside.
+    if no_lease_s is not None:
+        held = _duration_label(no_lease_s)
+        if no_lease_s >= cfg.no_lease_critical_s:
+            alarm.raise_to(CRITICAL, f"{no_lease_label} has no address ({held})")
+        elif no_lease_s >= cfg.no_lease_warning_s:
+            alarm.raise_to(WARNING, f"{no_lease_label} has no address ({held})")
 
     # The gateway's own heat. Not a WAN fault, but the frame exists to make
     # someone walk to the rack, and a gateway cooking itself is worth the walk

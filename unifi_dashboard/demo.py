@@ -31,7 +31,8 @@ class DemoSource:
 
     #: Fault injections, so the alarm states can be seen without breaking a
     #: real network to do it. Selected with --demo-fault.
-    FAULTS = ("none", "quiet", "wan-down", "dns", "loss", "latency", "failover", "hot")
+    FAULTS = ("none", "quiet", "wan-down", "dns", "loss", "latency", "failover",
+              "hot", "no-lease")
 
     def __init__(self, seed: int | None = None, fault: str = "none") -> None:
         self.rng = random.Random(seed)
@@ -140,7 +141,10 @@ class DemoSource:
         self.client_count = max(28, min(56, self.client_count + self.rng.choice([-1, 0, 0, 0, 1])))
         uptime = int(time.time() - self.start) + 1_083_600
 
-        failed_over = self.fault == "failover"
+        # A lapsed lease: the cable is fine and the link stays up, there is
+        # simply no address on it any more, and the backup has taken over.
+        no_lease = self.fault == "no-lease"
+        failed_over = self.fault == "failover" or no_lease
         wan_down = self.fault == "wan-down"
         # Far enough past the default 90C critical that jitter cannot dip it
         # back under and make the border flicker while someone is watching it.
@@ -186,7 +190,7 @@ class DemoSource:
                 # Shaped like a real UCG-Max: no wan_networkgroup, `name` is
                 # the interface name, and the cellular link is an mbb tunnel.
                 "wan1": {
-                    "up": not (failed_over or wan_down),
+                    "up": no_lease or not (failed_over or wan_down),
                     "ifname": "eth4",
                     "name": "eth4",
                     "type": "ethernet",

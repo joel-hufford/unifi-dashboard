@@ -94,3 +94,29 @@ def test_an_outage_still_leads_over_a_hot_gateway():
     alarm = check(wan_up=False, temperature_c=95.0, **HOT)
     assert alarm.headline == "WAN is down"
     assert "Gateway at 95°C" in alarm.reasons
+
+
+LEASE = dict(no_lease_label="WAN 1")
+
+
+def test_a_brief_gap_with_no_address_is_not_yet_a_failure():
+    # A DHCP exchange takes a moment; shouting at three seconds would make the
+    # border meaningless every time the gateway reboots.
+    assert check(no_lease_s=10.0, **LEASE).level == OK
+
+
+def test_a_link_up_with_no_address_warns_then_escalates():
+    assert check(no_lease_s=45.0, **LEASE).level == WARNING
+    assert check(no_lease_s=180.0, **LEASE).level == CRITICAL
+
+
+def test_the_addressless_link_is_named_and_timed():
+    assert check(no_lease_s=180.0, **LEASE).headline == "WAN 1 has no address (3m)"
+    assert check(no_lease_s=45.0, **LEASE).headline == "WAN 1 has no address (45s)"
+
+
+def test_a_lapsed_lease_leads_over_the_failover_it_caused():
+    # Running on backup is the symptom; the link that lost its address is why.
+    alarm = check(no_lease_s=300.0, on_backup=True, **LEASE)
+    assert alarm.headline == "WAN 1 has no address (5m)"
+    assert "Running on the backup WAN" in alarm.reasons

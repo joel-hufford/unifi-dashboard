@@ -227,3 +227,68 @@ async def test_a_cool_gateway_says_nothing():
     snapshot = await make_poller().tick()
     assert snapshot["gateway"]["temperature_c"] < 80
     assert snapshot["alarm"]["level"] == "ok"
+
+
+@pytest.mark.asyncio
+async def test_an_addressless_wired_link_is_timed_not_alarmed_immediately():
+    poller = make_poller()
+    poller.demo.fault = "no-lease"
+    snapshot = await poller.tick()
+
+    wan1 = next(l for l in snapshot["wan_links"] if l["key"] == "wan1")
+    assert wan1["up"] is True and wan1["ip"] is None
+    assert wan1["no_lease_s"] == pytest.approx(0, abs=1)
+    # Zero seconds in, the only complaint is the failover it caused.
+    assert not any("no address" in r for r in snapshot["alarm"]["reasons"])
+
+
+@pytest.mark.asyncio
+async def test_a_wired_link_addressless_long_enough_raises_the_alarm():
+    poller = make_poller()
+    poller.demo.fault = "no-lease"
+    await poller.tick()
+    poller._no_lease_since["wan1"] -= 200          # as if it had been so for 3m
+    snapshot = await poller.tick()
+
+    assert snapshot["alarm"]["level"] == "critical"
+    assert snapshot["alarm"]["reasons"][0].startswith("WAN 1 has no address")
+
+
+@pytest.mark.asyncio
+async def test_an_idle_cellular_backup_is_never_counted_as_a_lost_lease():
+    # WAN 3 sits up and addressless all day by design. Counting it would put a
+    # permanent warning on a healthy network, which is the fastest way to
+    # teach someone to ignore the border.
+    poller = make_poller()
+    snapshot = await poller.tick()
+
+    wan3 = next(l for l in snapshot["wan_links"] if l["key"] == "wan3")
+    assert wan3["up"] is True and wan3["ip"] is None and wan3["cellular"] is True
+    assert wan3["no_lease_s"] is None
+    assert "wan3" not in poller._no_lease_since
+    assert snapshot["alarm"]["level"] == "ok"
+
+
+@pytest.mark.asyncio
+async def test_a_down_link_is_not_reported_as_a_lease_problem():
+    # There is no lease to lose over a dead cable, and "WAN is down" already
+    # says the useful thing.
+    poller = make_poller()
+    poller.demo.fault = "wan-down"
+    snapshot = await poller.tick()
+
+    assert poller._no_lease_since == {}
+    assert not any("no address" in r for r in snapshot["alarm"]["reasons"])
+
+
+@pytest.mark.asyncio
+async def test_the_clock_resets_once_an_address_comes_back():
+    poller = make_poller()
+    poller.demo.fault = "no-lease"
+    await poller.tick()
+    assert "wan1" in poller._no_lease_since
+
+    poller.demo.fault = "none"
+    snapshot = await poller.tick()
+    assert poller._no_lease_since == {}
+    assert snapshot["alarm"]["level"] == "ok"

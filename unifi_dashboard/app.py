@@ -83,6 +83,8 @@ def create_app(cfg: Config) -> FastAPI:
             # differs from this is running code the server has replaced.
             "build": asset_version(),
             "temperature_unit": cfg.ui.temperature_unit,
+            "no_lease_warning_s": cfg.alarm.no_lease_warning_s,
+            "no_lease_critical_s": cfg.alarm.no_lease_critical_s,
             "temp_warning_c": cfg.gateway.temp_warning_c,
             "temp_critical_c": cfg.gateway.temp_critical_c,
             "throughput_scale": cfg.charts.throughput_scale,

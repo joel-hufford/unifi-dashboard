@@ -55,6 +55,9 @@ class Poller:
         # moving past the one recorded when it was asked for.
         self._speedtest = {"requested_at": None, "baseline_ts": None, "error": None}
         self._last_wan = None
+        # When each wired link was first seen up with no address, so a lapsed
+        # lease can be timed rather than alarmed on the first empty poll.
+        self._no_lease_since: dict[str, float] = {}
 
     # -- lifecycle --------------------------------------------------------
 
@@ -146,6 +149,10 @@ class Poller:
 
         public = await self._public_ip(current.ip if current else wan.ip)
 
+        no_lease = self._no_lease_elapsed(links, now)
+        worst = max(no_lease, key=no_lease.__getitem__, default=None)
+        by_key = {link.key: link for link in links}
+
         state = alarm_rules.evaluate(
             self.cfg.alarm,
             controller_ok=True,
@@ -155,6 +162,8 @@ class Poller:
             loss_pct=probe.loss_pct,
             latency_ms=probe.avg_ms,
             on_backup=on_backup,
+            no_lease_s=no_lease[worst] if worst else None,
+            no_lease_label=by_key[worst].label if worst else "WAN",
             temperature_c=gateway.temperature_c,
             overheating=gateway.overheating,
             temp_warning_c=self.cfg.gateway.temp_warning_c,
@@ -180,7 +189,10 @@ class Poller:
                     else public.address != current.ip
                 ),
             },
-            "wan_links": [asdict(link) for link in links],
+            "wan_links": [
+                {**asdict(link), "no_lease_s": no_lease.get(link.key)}
+                for link in links
+            ],
             "wan": {
                 **asdict(wan),
                 "rx_bps": rx_bps,
@@ -245,6 +257,29 @@ class Poller:
         if wan.rx_bytes < prev_rx or wan.tx_bytes < prev_tx:
             return None, None
         return (wan.rx_bytes - prev_rx) / elapsed, (wan.tx_bytes - prev_tx) / elapsed
+
+    def _no_lease_elapsed(self, links, now: float) -> dict[str, float]:
+        """How long each wired link has been up while holding no address.
+
+        A cellular backup that dials on demand sits up and addressless all day
+        by design, so it is never counted. A link that is down is not counted
+        either: there is no lease to lose over a dead cable, and "WAN is down"
+        already says the useful thing.
+
+        Timing starts when this process first sees the condition. Restarting
+        mid-outage restarts the clock, which delays the warning rather than
+        inventing a history we did not observe.
+        """
+        elapsed: dict[str, float] = {}
+        for link in links:
+            if link.cellular or not link.up or link.ip:
+                self._no_lease_since.pop(link.key, None)
+                continue
+            elapsed[link.key] = now - self._no_lease_since.setdefault(link.key, now)
+        stale = set(self._no_lease_since) - {link.key for link in links}
+        for key in stale:
+            del self._no_lease_since[key]
+        return elapsed
 
     def _record_failure(self, message: str) -> None:
         # A poll failure tells us nothing about the WAN itself, so the alarm

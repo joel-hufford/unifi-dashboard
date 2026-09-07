@@ -108,6 +108,11 @@ class AlarmConfig:
     # Running on the backup WAN is not an outage, but on a metered cellular
     # link it is something you want to notice the same day it happens.
     failover_is_critical: bool = False
+    # How long a wired WAN may sit up with no address before we call it a
+    # failure. A DHCP exchange completes in seconds and retries back off at
+    # 4, 8, 16, 32; by 45s several attempts have gone unanswered.
+    no_lease_warning_s: float = 45.0
+    no_lease_critical_s: float = 180.0
 
 
 @dataclass

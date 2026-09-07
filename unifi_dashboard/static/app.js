@@ -74,6 +74,15 @@
     return `${minutes}m`;
   }
 
+  // Matches the server's own wording for the same measurement, so the banner
+  // and the note under the lamp cannot disagree about how long it has been.
+  function briefDuration(seconds) {
+    if (seconds == null || !isFinite(seconds)) return "";
+    if (seconds < 90) return `${Math.round(seconds)}s`;
+    if (seconds < 5400) return `${Math.round(seconds / 60)}m`;
+    return `${(seconds / 3600).toFixed(1)}h`;
+  }
+
   const clockText = (date) =>
     date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", hour12: false });
 
@@ -213,7 +222,9 @@
     if (link.ip) return "idle";
     // A cellular backup that only dials on demand holds no address while idle,
     // which is normal. A wired standby with no address is not.
-    return link.cellular ? "idle" : "warning";
+    if (link.cellular) return "idle";
+    const critical = data.config?.no_lease_critical_s ?? 180;
+    return link.no_lease_s >= critical ? "critical" : "warning";
   }
 
   function linkNote(link, data) {
@@ -221,7 +232,9 @@
     if (noService(data)) return "no service";
     if (link.active) return "active";
     if (link.ip) return "standby";
-    return link.cellular ? "standby" : "no address";
+    if (link.cellular) return "standby";
+    const held = briefDuration(link.no_lease_s);
+    return held ? `no address ${held}` : "no address";
   }
 
   function selectedLink(data) {
