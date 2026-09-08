@@ -88,6 +88,13 @@ class UiConfig:
     theme: str = "dark"
     # "C" or "F". The controller reports Celsius; this only changes the display.
     temperature_unit: str = "C"
+    # How often the page asks the server for the current snapshot. This is not
+    # the controller poll: /api/dashboard serves what the last poll already
+    # collected, so this costs one local request and no gateway traffic. It is
+    # deliberately faster than poll_interval - the two loops are independent,
+    # and without this the page can sit on a fresh alarm for a whole interval
+    # simply because it asked a moment before the poll landed.
+    refresh_ms: int = 2000
 
 
 @dataclass

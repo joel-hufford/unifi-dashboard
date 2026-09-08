@@ -79,6 +79,7 @@ def create_app(cfg: Config) -> FastAPI:
             "ping_target": cfg.ping.target,
             "dns_host": cfg.dns.probe_host,
             "theme": cfg.ui.theme,
+            "refresh_ms": cfg.ui.refresh_ms,
             # The id of the front-end currently on disk. A page whose own build
             # differs from this is running code the server has replaced.
             "build": asset_version(),

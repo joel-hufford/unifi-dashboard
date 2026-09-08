@@ -5,7 +5,7 @@
   "use strict";
 
   const SVG_NS = "http://www.w3.org/2000/svg";
-  const REFRESH_FLOOR_MS = 4000;
+  const DEFAULT_REFRESH_MS = 2000;
   const SPEEDTEST_POLL_MS = 2000;
   const PAD = { top: 16, right: 10, bottom: 4, left: 8 };
   const AXIS_BAND = 18;
@@ -150,9 +150,13 @@
   function scheduleRefresh() {
     clearTimeout(state.timer);
     const running = state.data?.speedtest?.running;
+    // Not tied to poll_interval: this endpoint serves the snapshot the last
+    // poll already collected, so asking more often costs a local request and
+    // no controller traffic - and it is what stops the page sitting on a
+    // fresh alarm because it happened to ask just before the poll landed.
     const interval = running
       ? SPEEDTEST_POLL_MS
-      : Math.max(REFRESH_FLOOR_MS, (state.data?.poll_interval || 10) * 1000);
+      : (state.data?.config?.refresh_ms || DEFAULT_REFRESH_MS);
     state.timer = setTimeout(async () => {
       await refresh();
       scheduleRefresh();

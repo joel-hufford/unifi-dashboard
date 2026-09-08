@@ -18,7 +18,10 @@
 # later.
 
 # Seconds between controller polls. 10s keeps the load on the console trivial
-# while still giving a 360-point graph over one hour.
+# while still giving a 360-point graph over one hour. This is the larger half
+# of how long it takes a fault to reach the screen, so lower it to about 5 if
+# you want the border sooner and do not mind twice the polls and twice the
+# history rows. See also ui.refresh_ms, which is the other half and is free.
 poll_interval = 10.0
 
 [unifi]
@@ -110,6 +113,13 @@ temp_critical_c = 90.0
 theme = "dark"
 # "C" or "F". The controller reports Celsius; this only changes the display.
 temperature_unit = "C"
+# How often the page asks the server for the current snapshot. This is NOT a
+# controller poll: /api/dashboard serves what the last poll already collected,
+# so this costs one local request and no gateway traffic. Keeping it well under
+# poll_interval matters because the two loops are independent - at equal rates
+# the page can sit on a fresh alarm for a whole interval simply because it
+# asked a moment before the poll landed.
+refresh_ms = 2000
 
 [server]
 host = "127.0.0.1"  # 0.0.0.0 to reach the dashboard from other machines

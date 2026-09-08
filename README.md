@@ -123,6 +123,38 @@ the rack*, and a gateway cooking itself qualifies. An outage still takes the
 headline when both are true; the temperature appears as a second reason.
 `--demo-fault hot` shows it without heating any real hardware.
 
+### How fast a fault reaches the screen
+
+Two independent loops sit between a WAN failure and the red border, and their
+delays add: the service polls the controller every `poll_interval`, and the
+page asks the service for the current snapshot every `ui.refresh_ms`.
+
+Only the first of those costs anything. `/api/dashboard` serves the snapshot
+the last poll already collected - it does not call the controller - so the page
+can ask several times a second for the price of a local request. That is why
+`refresh_ms` defaults to 2s while `poll_interval` defaults to 10s. Running both
+at the same rate is the worst case: the page can sit on a fresh alarm for a
+whole interval purely because it asked a moment before the poll landed.
+
+Measured end to end in demo mode, from breaking the WAN to the border turning
+red, sampled across the poll cycle:
+
+| poll_interval | refresh_ms | observed |
+|---|---|---|
+| 10s | 10s | 4.7 - 12.3s |
+| 10s | 2s | 0.9 - 6.0s |
+| 5s | 2s | 0.8 - 4.3s |
+
+Real hardware adds the controller's own detection time on top - the gateway has
+to notice and publish the state change before any of this can see it - so treat
+these as the floor, not the total.
+
+There is a limit worth knowing: no polling rate beats the controller's own
+detection latency for link state. The reachability check is different, because
+the ping to `ping.target` is the service's own measurement and owes nothing to
+the controller; when an uplink is unplugged that is usually the signal that
+fires first.
+
 ### The WAN DHCP lease
 
 The gateway holds its WAN address on a DHCP lease, and a lease that stops
